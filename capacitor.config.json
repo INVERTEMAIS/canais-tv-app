@@ -1,0 +1,20 @@
+{
+  "appId": "com.canaistv.app",
+  "appName": "Canais TV",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "*.redecanaistv.af",
+      "redecanaistv.af",
+      "*.redecanais.*",
+      "*"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

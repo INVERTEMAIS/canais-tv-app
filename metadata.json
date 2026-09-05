@@ -1,0 +1,6 @@
+{
+  "name": "Canais TV Play",
+  "description": "Aplicativo de streaming e player de canais para Android TV com navegação por controle remoto, organização alfabética e gerenciador de iframes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
