@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, RotateCw, Volume2, Maximize, AlertCircle, ChevronUp, ChevronDown, Radio, ShieldCheck, ShieldAlert, Smartphone, Sparkles } from 'lucide-react';
 import { Channel, AdBlockMode } from '../types';
 import { AndroidAdBlockModal } from './AndroidAdBlockModal';
+import { getStoredPlayerMode, savePlayerMode, getSandboxAttribute } from '../utils/playerSecurity';
 
 interface ChannelPlayerProps {
   channel: Channel;
@@ -22,9 +23,11 @@ export const ChannelPlayer: React.FC<ChannelPlayerProps> = ({
   const [iframeKey, setIframeKey] = useState(0);
   const [aspectRatio, setAspectRatio] = useState<'fit' | 'fill' | '16-9'>('fit');
   const [currentTime, setCurrentTime] = useState('');
-  const [adBlockMode, setAdBlockMode] = useState<AdBlockMode>('strict');
+  const [adBlockMode, setAdBlockMode] = useState<AdBlockMode>(() => getStoredPlayerMode());
   const [showAndroidModal, setShowAndroidModal] = useState(false);
-  const [shieldNotice, setShieldNotice] = useState<string | null>('Proteção Anti-Popups & Anti-Redirecionamento Ativa');
+  const [shieldNotice, setShieldNotice] = useState<string | null>(
+    'Modo Anti-Bloqueio Direto Ativo (100% Compatível com RedeCanais)'
+  );
   const osdTimerRef = useRef<number | null>(null);
 
   const resetOsdTimer = useCallback(() => {
@@ -138,12 +141,30 @@ export const ChannelPlayer: React.FC<ChannelPlayerProps> = ({
   const currentIndex = channels.findIndex((c) => c.id === channel.id);
 
   // Sandbox attributes calculation:
-  // In 'strict' mode (Default): We intentionally DO NOT pass 'allow-popups' and 'allow-top-navigation'
-  // This physically blocks any new tab or browser redirection upon clicking play on the iframe!
-  const sandboxDirectives =
-    adBlockMode === 'strict'
-      ? 'allow-scripts allow-same-origin allow-forms allow-presentation'
-      : 'allow-scripts allow-same-origin allow-forms allow-presentation allow-popups';
+  // 'direct': sem sandbox (100% livre do detector anti-adblock do RedeCanais)
+  // 'standard': sandbox com permissão a popups
+  // 'strict': sandbox sem permissão a popups
+  const sandboxDirectives = getSandboxAttribute(adBlockMode);
+
+  const cycleAdBlockMode = () => {
+    let next: AdBlockMode = 'direct';
+    if (adBlockMode === 'direct') next = 'standard';
+    else if (adBlockMode === 'standard') next = 'strict';
+    else next = 'direct';
+
+    setAdBlockMode(next);
+    savePlayerMode(next);
+    setIframeKey((k) => k + 1);
+
+    const msg =
+      next === 'direct'
+        ? 'Modo Direto: Livre do bloqueio RedeCanais (Recomendado)'
+        : next === 'standard'
+        ? 'Modo Tolerante (Sandbox com Popups)'
+        : 'Modo Estrito (Sandbox Sem Popups)';
+    setShieldNotice(msg);
+    setTimeout(() => setShieldNotice(null), 3500);
+  };
 
   return (
     <div
@@ -162,6 +183,7 @@ export const ChannelPlayer: React.FC<ChannelPlayerProps> = ({
           scrolling="no"
           allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
           allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
           className={`w-full h-full border-0 ${
             aspectRatio === 'fill'
               ? 'object-fill scale-105'
@@ -222,24 +244,24 @@ export const ChannelPlayer: React.FC<ChannelPlayerProps> = ({
             {/* Anti-Ad Protection Toggle */}
             <button
               type="button"
-              onClick={() => {
-                setAdBlockMode((prev) => (prev === 'strict' ? 'standard' : 'strict'));
-                setShieldNotice(
-                  adBlockMode === 'strict'
-                    ? 'Proteção padrão aplicada (Popups podem ser permitidos)'
-                    : 'Proteção Anti-Popups Máxima Reativada'
-                );
-                setTimeout(() => setShieldNotice(null), 3000);
-              }}
-              title="Clique para alternar o nível do Escudo Anti-Anúncios"
+              onClick={cycleAdBlockMode}
+              title="Clique para alternar: Modo Direto (Sem bloqueio RedeCanais), Tolerante ou Estrito"
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border cursor-pointer ${
-                adBlockMode === 'strict'
-                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50 hover:bg-emerald-900/80'
-                  : 'bg-amber-950/90 text-amber-300 border-amber-500/50 hover:bg-amber-900/80'
+                adBlockMode === 'direct'
+                  ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/80 hover:bg-emerald-900/80'
+                  : adBlockMode === 'standard'
+                  ? 'bg-amber-950/90 text-amber-300 border-amber-500/80 hover:bg-amber-900/80'
+                  : 'bg-red-950/90 text-red-300 border-red-500/80 hover:bg-red-900/80'
               }`}
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Anti-Anúncios: {adBlockMode === 'strict' ? 'MÁXIMO' : 'PADRÃO'}</span>
+              <span>
+                {adBlockMode === 'direct'
+                  ? 'Anti-Bloqueio: DIRETO'
+                  : adBlockMode === 'standard'
+                  ? 'Modo: TOLERANTE'
+                  : 'Modo: ESTRITO'}
+              </span>
             </button>
 
             {/* Android WebView Code Guide Button */}

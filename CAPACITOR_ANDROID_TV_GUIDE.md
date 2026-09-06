@@ -11,12 +11,13 @@ Este manual reúne todas as etapas e códigos necessários para versionar este p
 3. [Como Clonar e Configurar em uma Nova Máquina](#3-como-clonar-e-configurar-em-uma-nova-máquina)
 4. [Instalação e Sincronização do Capacitor](#4-instalação-e-sincronização-do-capacitor)
 5. [Código 1: capacitor.config.json](#5-código-1-capacitorconfigjson)
-6. [Código 2: AndroidManifest.xml (Híbrido TV + Celular)](#6-código-2-androidmanifestxml-híbrido-tv--celular)
-7. [Código 3: MainActivity.java (D-Pad da TV + Bloqueio de Anúncios)](#7-código-3-mainactivityjava-d-pad-da-tv--bloqueio-de-anúncios)
-8. [Banner Obrigatório da Android TV (320x180 px)](#8-banner-obrigatório-da-android-tv-320x180-px)
-9. [Como Compilar o APK no Android Studio](#9-como-compilar-o-apk-no-android-studio)
-10. [Como Instalar na Smart TV e no Celular](#10-como-instalar-na-smart-tv-e-no-celular)
-11. [Rotina de Atualizações Futuras com o GitHub](#11-rotina-de-atualizações-futuras-com-o-github)
+6. [Código 2: google-services.json na pasta app (Firebase)](#6-código-2-google-servicesjson-na-pasta-app-firebase)
+7. [Código 3: AndroidManifest.xml (Híbrido TV + Celular)](#7-código-3-androidmanifestxml-híbrido-tv--celular)
+8. [Código 4: MainActivity.java (D-Pad da TV + Bloqueio de Anúncios)](#8-código-4-mainactivityjava-d-pad-da-tv--bloqueio-de-anúncios)
+9. [Banner Obrigatório da Android TV (320x180 px)](#9-banner-obrigatório-da-android-tv-320x180-px)
+10. [Como Compilar o APK no Android Studio](#10-como-compilar-o-apk-no-android-studio)
+11. [Como Instalar na Smart TV e no Celular](#11-como-instalar-na-smart-tv-e-no-celular)
+12. [Rotina de Atualizações Futuras com o GitHub](#12-rotina-de-atualizações-futuras-com-o-github)
 
 ---
 
@@ -180,7 +181,61 @@ Verifique se o arquivo `capacitor.config.json` na raiz do projeto está configur
 
 ---
 
-## 6. Código 2: `AndroidManifest.xml` (Híbrido TV + Celular)
+## 6. Código 2: `google-services.json` na pasta app (Firebase)
+
+O projeto Firebase foi criado no console com o ID: **`micro-catcher-mpthm`**.
+
+O arquivo `google-services.json` é o arquivo oficial que o plugin do Google Services do Gradle lê no Android Studio. Ele deve ficar localizado na pasta do módulo do app:
+
+📁 **Caminho:** `android/app/google-services.json`  
+*(Também criamos uma cópia em `app/google-services.json` e na raiz do projeto).*
+
+### Conteúdo do `google-services.json`:
+```json
+{
+  "project_info": {
+    "project_number": "88349835370",
+    "project_id": "micro-catcher-mpthm",
+    "storage_bucket": "micro-catcher-mpthm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88349835370:android:8af9985f745c5246230a13",
+        "android_client_info": {
+          "package_name": "com.canaistv.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhp3AovgFu23w6SdknzvWrPBEmBHmR7FI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+```
+
+---
+
+## 7. Código 3: `AndroidManifest.xml` (Híbrido TV + Celular)
 
 Localização do arquivo:
 `android/app/src/main/AndroidManifest.xml`
@@ -345,6 +400,13 @@ public class MainActivity extends BridgeActivity {
     }
 }
 ```
+
+### 💡 Por que o RedeCanais exibia "Página Bloqueada" e como foi resolvido:
+- **Causa da Detecção:** O player do RedeCanais possui um script de proteção que inspeciona o elemento `<iframe>`. Se ele detectar um atributo HTML `sandbox` restritivo bloqueando popups, o site assume que é um bloqueador de anúncios agressivo e substitui o vídeo pela tela de alerta *"Página Bloqueada! Os Espertinhos sempre se ferra!..."*.
+- **Solução no App:**
+  1. O aplicativo agora adota o **Modo Direto (Anti-Bloqueio)** como padrão. Ele renderiza o `<iframe>` sem restrições de sandbox no HTML, permitindo que o script do player inicialize 100% liso.
+  2. No APK Android, a proteção contra popups indesejados é feita **nativamente na WebView** através das configurações da `MainActivity.java` (`setSupportMultipleWindows(false)` e `shouldOverrideUrlLoading`). Dessa forma, nenhum anúncio externo ou popup consegue abrir no app, e o site nunca descobre nem bloqueia a transmissão!
+  3. No player web, há também o seletor com botão de modo e um botão rápido *"Liberar Player"* caso o usuário queira alternar entre Modo Direto, Tolerante ou Estrito a qualquer momento.
 
 ---
 

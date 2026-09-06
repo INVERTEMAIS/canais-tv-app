@@ -24,7 +24,7 @@ export type AppView = 'channels' | 'movies';
 
 export type AlphabetFilter = 'TODOS' | string;
 
-export type AdBlockMode = 'strict' | 'standard';
+export type AdBlockMode = 'direct' | 'standard' | 'strict';
 
 export interface RemoteKeyFeedback {
   key: string;

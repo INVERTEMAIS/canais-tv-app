@@ -11,9 +11,10 @@ import {
   ClipboardPaste,
   Tv,
   Check,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
-import { SavedMovie } from '../types';
+import { SavedMovie, AdBlockMode } from '../types';
 import {
   getStoredMovieTemplate,
   saveStoredMovieTemplate,
@@ -23,6 +24,7 @@ import {
   parseServerAndVidFromText,
   DEFAULT_MOVIE_IFRAME_TEMPLATE
 } from '../utils/movieStorage';
+import { getStoredPlayerMode, savePlayerMode, getSandboxAttribute } from '../utils/playerSecurity';
 
 interface MoviesOnDemandViewProps {
   onTvFocusChange?: () => void;
@@ -37,6 +39,28 @@ export const MoviesOnDemandView: React.FC<MoviesOnDemandViewProps> = () => {
   const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
   const [activeMovieTitle, setActiveMovieTitle] = useState<string>('');
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playerMode, setPlayerMode] = useState<AdBlockMode>(() => getStoredPlayerMode());
+  const [playerReloadKey, setPlayerReloadKey] = useState<number>(0);
+
+  const cyclePlayerMode = () => {
+    let next: AdBlockMode = 'direct';
+    if (playerMode === 'direct') next = 'standard';
+    else if (playerMode === 'standard') next = 'strict';
+    else next = 'direct';
+
+    setPlayerMode(next);
+    savePlayerMode(next);
+    setPlayerReloadKey((k) => k + 1);
+
+    const msg =
+      next === 'direct'
+        ? 'Modo Direto Ativado: 100% livre do bloqueio do RedeCanais'
+        : next === 'standard'
+        ? 'Modo Tolerante Ativado (Sandbox com Popups)'
+        : 'Modo Estrito Ativado (Sandbox Sem Popups)';
+    setStatusMessage(msg);
+    setTimeout(() => setStatusMessage(null), 3500);
+  };
 
   // Template config modal/collapse
   const [showTemplateConfig, setShowTemplateConfig] = useState<boolean>(false);
@@ -156,20 +180,21 @@ export const MoviesOnDemandView: React.FC<MoviesOnDemandViewProps> = () => {
           <div className="relative w-full h-full flex flex-col justify-between bg-black">
             {/* Embedded Iframe Player */}
             <iframe
-              key={activeStreamUrl}
+              key={`${activeStreamUrl}-${playerReloadKey}-${playerMode}`}
               name="MoviePlayer"
               title={activeMovieTitle || 'Filme On Demand'}
               src={activeStreamUrl}
-              sandbox="allow-scripts allow-same-origin allow-presentation"
+              sandbox={getSandboxAttribute(playerMode)}
               frameBorder="0"
               scrolling="no"
               allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
               allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
               className="w-full h-full flex-1 border-0"
             />
 
             {/* Floating Quick Bar for TV */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-30">
               <div className="bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-neutral-800 pointer-events-auto flex items-center gap-2 shadow-lg">
                 <Film className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-bold text-white truncate max-w-xs md:max-w-md">
@@ -181,6 +206,28 @@ export const MoviesOnDemandView: React.FC<MoviesOnDemandViewProps> = () => {
               </div>
 
               <div className="flex items-center gap-2 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={cyclePlayerMode}
+                  title="Alternar entre Modo Direto (Sem bloqueio RedeCanais), Tolerante ou Estrito"
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                    playerMode === 'direct'
+                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600 hover:bg-emerald-900'
+                      : playerMode === 'standard'
+                      ? 'bg-amber-950/90 text-amber-300 border-amber-600 hover:bg-amber-900'
+                      : 'bg-red-950/90 text-red-300 border-red-600 hover:bg-red-900'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>
+                    {playerMode === 'direct'
+                      ? 'Anti-Bloqueio: DIRETO'
+                      : playerMode === 'standard'
+                      ? 'Modo: TOLERANTE'
+                      : 'Modo: ESTRITO'}
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsPlaying(false)}

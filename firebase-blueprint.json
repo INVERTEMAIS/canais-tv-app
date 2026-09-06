@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Channel": {
+      "title": "Channel",
+      "description": "TV Channel item with stream URL and metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "canalCode": { "type": "string" },
+        "number": { "type": "number" },
+        "category": { "type": "string" },
+        "iframeCode": { "type": "string" },
+        "streamUrl": { "type": "string" },
+        "description": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "streamUrl"]
+    },
+    "SavedMovie": {
+      "title": "SavedMovie",
+      "description": "Saved movie with server and video id",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "server": { "type": "string" },
+        "vid": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title"]
+    }
+  },
+  "firestore": {
+    "/channels/{channelId}": {
+      "schema": "Channel",
+      "description": "Collection of available TV channels"
+    },
+    "/savedMovies/{movieId}": {
+      "schema": "SavedMovie",
+      "description": "Collection of saved movies"
+    }
+  }
+}

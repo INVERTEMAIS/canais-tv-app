@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Search, Maximize, Edit2, Trash2, Plus, Star, Tv } from 'lucide-react';
-import { Channel } from '../types';
+import { Play, Search, Maximize, Edit2, Trash2, Plus, Star, Tv, ShieldCheck, RotateCw, AlertTriangle } from 'lucide-react';
+import { Channel, AdBlockMode } from '../types';
 import { ChannelLogoBadge } from './ChannelLogoBadge';
 import { sortChannelsAlphabetically } from '../utils/defaultChannels';
+import { getStoredPlayerMode, savePlayerMode, getSandboxAttribute } from '../utils/playerSecurity';
 
 interface LiveChannelsSidebarViewProps {
   channels: Channel[];
@@ -31,8 +32,31 @@ export const LiveChannelsSidebarView: React.FC<LiveChannelsSidebarViewProps> = (
   });
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
+  const [playerMode, setPlayerMode] = useState<AdBlockMode>(() => getStoredPlayerMode());
+  const [playerReloadKey, setPlayerReloadKey] = useState<number>(0);
+  const [modeNotice, setModeNotice] = useState<string | null>(null);
   const channelListRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const cyclePlayerMode = () => {
+    let next: AdBlockMode = 'direct';
+    if (playerMode === 'direct') next = 'standard';
+    else if (playerMode === 'standard') next = 'strict';
+    else next = 'direct';
+
+    setPlayerMode(next);
+    savePlayerMode(next);
+    setPlayerReloadKey((k) => k + 1);
+
+    const msg =
+      next === 'direct'
+        ? 'Modo Direto Ativado (Sem restrição de frame - Recomendado RedeCanais)'
+        : next === 'standard'
+        ? 'Modo Tolerante Ativado (Sandbox com Popups)'
+        : 'Modo Estrito Ativado (Sandbox Sem Popups)';
+    setModeNotice(msg);
+    setTimeout(() => setModeNotice(null), 3500);
+  };
 
   // Sempre mantém os canais ordenados por ordem alfabética (A-Z)
   const sortedChannels = sortChannelsAlphabetically(channels);
@@ -96,21 +120,54 @@ export const LiveChannelsSidebarView: React.FC<LiveChannelsSidebarViewProps> = (
           isPlaying ? (
             /* Active Playing Channel with Anti-Ad Protections */
             <div className="relative w-full h-full flex flex-col justify-between bg-black">
+              {/* Feedback toast de troca de modo */}
+              {modeNotice && (
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-neutral-900/95 border border-cyan-500/80 text-cyan-300 text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 pointer-events-none animate-fade-in">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{modeNotice}</span>
+                </div>
+              )}
+
+              {/* Iframe do Canal com Suporte a Anti-Bloqueio RedeCanais */}
               <iframe
-                key={selectedChannel.id}
+                key={`${selectedChannel.id}-${playerReloadKey}-${playerMode}`}
                 name="Player"
                 title={selectedChannel.name}
                 src={selectedChannel.streamUrl}
-                sandbox="allow-scripts allow-same-origin allow-presentation"
+                sandbox={getSandboxAttribute(playerMode)}
                 frameBorder="0"
                 scrolling="no"
                 allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
                 allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
                 className="w-full h-full flex-1 border-0 bg-black"
               />
 
+              {/* Banner de Ajuda caso o usuário caia no detector do RedeCanais */}
+              {playerMode !== 'direct' && (
+                <div className="absolute bottom-2 inset-x-2 z-40 bg-amber-950/95 border border-amber-500/80 text-amber-200 px-3 py-2 rounded-xl flex items-center justify-between text-xs backdrop-blur-md shadow-2xl">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Viu <strong>"Página Bloqueada"</strong> do RedeCanais?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayerMode('direct');
+                      savePlayerMode('direct');
+                      setPlayerReloadKey((k) => k + 1);
+                      setModeNotice('Modo Direto Ativado: 100% livre do bloqueio do RedeCanais');
+                      setTimeout(() => setModeNotice(null), 3500);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs transition cursor-pointer"
+                  >
+                    Liberar Player Agora
+                  </button>
+                </div>
+              )}
+
               {/* Floating Overlays on hover/tap */}
-              <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none transition-opacity opacity-0 hover:opacity-100 focus-within:opacity-100">
+              <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none transition-opacity opacity-0 hover:opacity-100 focus-within:opacity-100 z-30">
                 <div className="bg-black/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-neutral-800 pointer-events-auto flex items-center gap-2.5 shadow-xl">
                   <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
                   <span className="text-xs font-bold text-white tracking-wide">
@@ -124,6 +181,39 @@ export const LiveChannelsSidebarView: React.FC<LiveChannelsSidebarViewProps> = (
                 </div>
 
                 <div className="flex items-center gap-2 pointer-events-auto">
+                  {/* Seletor de Modo Anti-Bloqueio */}
+                  <button
+                    type="button"
+                    onClick={cyclePlayerMode}
+                    title="Alternar entre Modo Direto (Sem bloqueio RedeCanais), Tolerante ou Estrito"
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                      playerMode === 'direct'
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600 hover:bg-emerald-900'
+                        : playerMode === 'standard'
+                        ? 'bg-amber-950/90 text-amber-300 border-amber-600 hover:bg-amber-900'
+                        : 'bg-red-950/90 text-red-300 border-red-600 hover:bg-red-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>
+                      {playerMode === 'direct'
+                        ? 'Anti-Bloqueio: DIRETO'
+                        : playerMode === 'standard'
+                        ? 'Modo: TOLERANTE'
+                        : 'Modo: ESTRITO'}
+                    </span>
+                  </button>
+
+                  {/* Botão Recarregar Player */}
+                  <button
+                    type="button"
+                    onClick={() => setPlayerReloadKey((k) => k + 1)}
+                    title="Recarregar player se travar"
+                    className="p-1.5 rounded-xl bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700 transition cursor-pointer"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </button>
+
                   {onEditChannel && (
                     <button
                       type="button"
@@ -183,6 +273,31 @@ export const LiveChannelsSidebarView: React.FC<LiveChannelsSidebarViewProps> = (
                       canal={selectedChannel.canalCode}
                     </span>
                   )}
+                </div>
+
+                {/* Seletor de Modo Anti-Bloqueio na tela inicial */}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={cyclePlayerMode}
+                    title="Alternar modo do player antes de iniciar"
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                      playerMode === 'direct'
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-700 hover:bg-emerald-900'
+                        : playerMode === 'standard'
+                        ? 'bg-amber-950 text-amber-300 border-amber-700 hover:bg-amber-900'
+                        : 'bg-red-950 text-red-300 border-red-700 hover:bg-red-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>
+                      {playerMode === 'direct'
+                        ? 'Anti-Bloqueio: Modo Direto (Sem restrição de tela)'
+                        : playerMode === 'standard'
+                        ? 'Modo: Tolerante'
+                        : 'Modo: Estrito'}
+                    </span>
+                  </button>
                 </div>
               </div>
 

@@ -21,7 +21,7 @@ interface AndroidAdBlockModalProps {
   onClose: () => void;
 }
 
-type GuideTab = 'github_flow' | 'terminal' | 'manifest' | 'main_activity' | 'capacitor_config' | 'export_apk';
+type GuideTab = 'github_flow' | 'google_services' | 'terminal' | 'manifest' | 'main_activity' | 'capacitor_config' | 'export_apk';
 
 export const AndroidAdBlockModal: React.FC<AndroidAdBlockModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<GuideTab>('github_flow');
@@ -127,6 +127,46 @@ npx cap sync android
 
 # 6. Abrir o projeto diretamente no Android Studio
 npx cap open android`;
+
+  const googleServicesJsonCode = `{
+  "project_info": {
+    "project_number": "88349835370",
+    "project_id": "micro-catcher-mpthm",
+    "storage_bucket": "micro-catcher-mpthm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88349835370:android:8af9985f745c5246230a13",
+        "android_client_info": {
+          "package_name": "com.canaistv.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhp3AovgFu23w6SdknzvWrPBEmBHmR7FI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}`;
 
   const capacitorConfigCode = `{
   "appId": "com.canaistv.app",
@@ -351,6 +391,19 @@ public class MainActivity extends BridgeActivity {
 
           <button
             type="button"
+            onClick={() => setActiveTab('google_services')}
+            className={`py-3 px-4 font-bold text-xs tracking-wider transition-all border-b-2 flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeTab === 'google_services'
+                ? 'border-cyan-400 text-cyan-300'
+                : 'border-transparent text-neutral-400 hover:text-white'
+            }`}
+          >
+            <FolderTree className="w-4 h-4 text-amber-400" />
+            <span>3. google-services.json (Firebase)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('manifest')}
             className={`py-3 px-4 font-bold text-xs tracking-wider transition-all border-b-2 flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === 'manifest'
@@ -359,7 +412,7 @@ public class MainActivity extends BridgeActivity {
             }`}
           >
             <Tv className="w-4 h-4" />
-            <span>3. AndroidManifest.xml</span>
+            <span>4. AndroidManifest.xml</span>
           </button>
 
           <button
@@ -372,7 +425,7 @@ public class MainActivity extends BridgeActivity {
             }`}
           >
             <Code className="w-4 h-4" />
-            <span>4. MainActivity.java</span>
+            <span>5. MainActivity.java</span>
           </button>
 
           <button
@@ -385,7 +438,7 @@ public class MainActivity extends BridgeActivity {
             }`}
           >
             <Laptop className="w-4 h-4" />
-            <span>5. capacitor.config.json</span>
+            <span>6. capacitor.config.json</span>
           </button>
 
           <button
@@ -398,7 +451,7 @@ public class MainActivity extends BridgeActivity {
             }`}
           >
             <Download className="w-4 h-4" />
-            <span>6. Gerar APK & Instalar na TV</span>
+            <span>7. Gerar APK & Instalar na TV</span>
           </button>
         </div>
 
@@ -560,6 +613,57 @@ public class MainActivity extends BridgeActivity {
             </div>
           )}
 
+          {/* TAB GOOGLE SERVICES (FIREBASE) */}
+          {activeTab === 'google_services' && (
+            <div className="space-y-4 max-w-4xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span>Arquivo: android/app/google-services.json</span>
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-0.5">
+                    Projeto Firebase criado: <code className="text-cyan-300 font-mono">micro-catcher-mpthm</code>. O arquivo já foi gerado na pasta <code className="text-emerald-300">android/app/</code> e <code className="text-emerald-300">app/</code>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(googleServicesJsonCode, 'googleServicesJsonCode')}
+                  className="px-3.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-neutral-700"
+                >
+                  {copiedSection === 'googleServicesJsonCode' ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Copiar google-services.json</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="rounded-xl bg-black border border-neutral-800 p-4 font-mono text-amber-300 overflow-x-auto text-[11px] leading-relaxed max-h-[45vh]">
+                <pre>{googleServicesJsonCode}</pre>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#141414] border border-neutral-800 space-y-2">
+                <span className="font-bold text-white text-xs block">
+                  Onde colocar este arquivo no Android Studio:
+                </span>
+                <p className="text-neutral-400 leading-relaxed text-[11px]">
+                  No seu projeto Android compilado pelo Capacitor, coloque o arquivo em:
+                  <br />
+                  📁 <code className="text-cyan-300 font-mono bg-black px-2 py-0.5 rounded">android/app/google-services.json</code>
+                  <br />
+                  *(Também salvamos uma cópia em <code className="text-white font-mono bg-black px-2 py-0.5 rounded">app/google-services.json</code> e na raiz do projeto)*.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* TAB 3: ANDROID MANIFEST */}
           {activeTab === 'manifest' && (
             <div className="space-y-4 max-w-4xl">
@@ -648,16 +752,29 @@ public class MainActivity extends BridgeActivity {
                   <li><strong className="text-neutral-200">onKeyDown(KEYCODE_BACK)</strong>: Faz o botão 'Voltar' do controle retornar de um canal ou fechar modais em vez de encerrar o app abruptamente.</li>
                 </ul>
               </div>
+
+              <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/70 text-emerald-200 text-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-emerald-300">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Por que o site acusou 'Página Bloqueada' e como foi resolvido:</span>
+                </div>
+                <p className="text-emerald-300/90 leading-relaxed">
+                  O player do RedeCanais possui um script de proteção que verifica se o <code className="bg-black/40 px-1 py-0.5 rounded text-white">&lt;iframe&gt;</code> possui restrições HTML de <code className="bg-black/40 px-1 py-0.5 rounded text-white">sandbox</code> bloqueando popups. Quando detecta o sandbox restrito, ele substitui a tela do vídeo pelo aviso de bloqueio.
+                </p>
+                <p className="text-emerald-300/90 leading-relaxed">
+                  <strong>A Solução:</strong> O app agora usa por padrão o <strong>Modo Direto</strong> (sem sandbox no HTML), fazendo com que o player do RedeCanais funcione normalmente sem disparar o detector. No Android APK, o bloqueio de popups e propagandas indesejadas é feito <strong>nativamente na WebView</strong> pelo código acima do <code className="bg-black/40 px-1 py-0.5 rounded text-white">MainActivity.java</code>, que suprime as janelas sem alertar o site!
+                </p>
+              </div>
             </div>
           )}
 
-          {/* TAB 5: CAPACITOR CONFIG */}
+          {/* TAB 6: CAPACITOR CONFIG */}
           {activeTab === 'capacitor_config' && (
             <div className="space-y-4 max-w-4xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-                    Passo 5: capacitor.config.json (Raiz do Projeto)
+                    Passo 6: capacitor.config.json (Raiz do Projeto)
                   </h3>
                   <p className="text-xs text-neutral-400 mt-0.5">
                     Já criado e configurado automaticamente no seu projeto com permissão para streams e iframes.
@@ -692,12 +809,12 @@ public class MainActivity extends BridgeActivity {
             </div>
           )}
 
-          {/* TAB 6: GERAR APK & INSTALAR NA TV */}
+          {/* TAB 7: GERAR APK & INSTALAR NA TV */}
           {activeTab === 'export_apk' && (
             <div className="space-y-5 max-w-4xl">
               <div>
                 <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-                  Passo 6: Compilar o APK e Instalar na Smart TV e Celular
+                  Passo 7: Compilar o APK e Instalar na Smart TV e Celular
                 </h3>
                 <p className="text-xs text-neutral-400 mt-0.5">
                   Como gerar o arquivo <code className="text-white font-mono">.apk</code> no Android Studio e instalar na TV.
