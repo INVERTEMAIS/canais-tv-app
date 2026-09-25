@@ -1,5 +1,5 @@
 export const DEFAULT_CHANNEL_IFRAME_TEMPLATE =
-  '<iframe name="Player" src="//%72%65%64%65%63%61%6E%61%69%73%74%76%2E%61%66/player3/ch.php?canal={canal}" frameborder="0" height="400" scrolling="no" width="640" allow="encrypted-media" allowFullScreen></iframe>';
+  '<iframe name="Player" src="https://%72%65%64%65%63%61%6E%61%69%73%74%76%2E%61%66/player3/ch.php?canal={canal}" frameborder="0" height="400" scrolling="no" width="640" allow="encrypted-media" allowFullScreen></iframe>';
 
 export const CHANNEL_TEMPLATE_STORAGE_KEY = 'canais_tv_channel_iframe_template_v1';
 

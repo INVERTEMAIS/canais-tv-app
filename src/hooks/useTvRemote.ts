@@ -98,11 +98,29 @@ export function useTvRemote(options: TvRemoteOptions) {
         return;
       }
 
-      // If user is typing in a form input, let them type normally
+      // If user is in an input or textarea, let text editing work, but allow ArrowUp / ArrowDown to move focus
       if (isInputFocused) {
         if (key === 'Enter') {
           optionsRef.current.onEnter?.();
+          return;
         }
+        if (key === 'ArrowDown' || keyCode === 20 || keyCode === 40) {
+          e.preventDefault();
+          target.blur();
+          triggerFeedback('▼ BAIXO');
+          tvAudio.playClick();
+          optionsRef.current.onDown?.();
+          return;
+        }
+        if (key === 'ArrowUp' || keyCode === 19 || keyCode === 38) {
+          e.preventDefault();
+          target.blur();
+          triggerFeedback('▲ CIMA');
+          tvAudio.playClick();
+          optionsRef.current.onUp?.();
+          return;
+        }
+        // Left and Right inside input move the cursor naturally
         return;
       }
 

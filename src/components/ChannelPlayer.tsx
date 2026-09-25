@@ -181,8 +181,8 @@ export const ChannelPlayer: React.FC<ChannelPlayerProps> = ({
           sandbox={sandboxDirectives}
           frameBorder="0"
           scrolling="no"
-          allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
-          allowFullScreen
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture; display-capture"
+          allowFullScreen={true}
           referrerPolicy="no-referrer-when-downgrade"
           className={`w-full h-full border-0 ${
             aspectRatio === 'fill'

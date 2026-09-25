@@ -187,8 +187,8 @@ export const MoviesOnDemandView: React.FC<MoviesOnDemandViewProps> = () => {
               sandbox={getSandboxAttribute(playerMode)}
               frameBorder="0"
               scrolling="no"
-              allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
-              allowFullScreen
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture; display-capture"
+              allowFullScreen={true}
               referrerPolicy="no-referrer-when-downgrade"
               className="w-full h-full flex-1 border-0"
             />

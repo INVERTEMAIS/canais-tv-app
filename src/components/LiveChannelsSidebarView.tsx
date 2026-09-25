@@ -137,7 +137,7 @@ export const LiveChannelsSidebarView: React.FC<LiveChannelsSidebarViewProps> = (
                 sandbox={getSandboxAttribute(playerMode)}
                 frameBorder="0"
                 scrolling="no"
-                allow="encrypted-media; autoplay; fullscreen; picture-in-picture; accelerometer; gyroscope"
+                allow="encrypted-media *; autoplay *; fullscreen *; picture-in-picture *; accelerometer *; gyroscope *"
                 allowFullScreen
                 referrerPolicy="no-referrer-when-downgrade"
                 className="w-full h-full flex-1 border-0 bg-black"

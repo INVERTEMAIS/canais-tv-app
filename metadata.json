@@ -1,6 +1,6 @@
 {
-  "name": "Canais TV Play",
-  "description": "Aplicativo de streaming e player de canais para Android TV com navegação por controle remoto, organização alfabética e gerenciador de iframes.",
+  "name": "NETPLAY",
+  "description": "Aplicativo de catálogo e streaming de filmes On-Demand e canais IPTV estilo Netflix para Celular e Android TV com reprodução nativa MP4 e M3U8, controle remoto D-PAD e importação em lote.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

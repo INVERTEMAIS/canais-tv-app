@@ -1,16 +1,10 @@
 {
-  "appId": "com.canaistv.app",
-  "appName": "Canais TV",
+  "appId": "com.netplay.app",
+  "appName": "NETPLAY",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https",
     "cleartext": true,
-    "allowNavigation": [
-      "*.redecanaistv.af",
-      "redecanaistv.af",
-      "*.redecanais.*",
-      "*"
-    ]
+    "androidScheme": "https"
   },
   "android": {
     "allowMixedContent": true,

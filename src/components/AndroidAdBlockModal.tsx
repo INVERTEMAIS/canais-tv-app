@@ -262,63 +262,201 @@ npx cap open android`;
   const mainActivityCode = `package com.canaistv.app;
 
 import android.os.Bundle;
+import android.os.Message;
 import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
+import java.io.ByteArrayInputStream;
 
 public class MainActivity extends BridgeActivity {
 
     private WebView webView;
+    private View customView;
+    private WebChromeClient.CustomViewCallback customViewCallback;
+    private FrameLayout fullscreenContainer;
+
+    // Resposta "MOCK" que engana o teste do RedeCanais (faz ele achar que os anúncios carregaram)
+    private static final String FAKE_ADS_JS = 
+        "window.canRunAds = true; " +
+        "window.isAdBlockActive = false; " +
+        "window.adsbygoogle = { push: function() {} }; " +
+        "window.google_ad_status = 1;";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Obtém a WebView do Capacitor
+        // Garante que a tela da Smart TV permaneça sempre ligada durante o vídeo
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         webView = this.bridge.getWebView();
 
         if (webView != null) {
-            // 1. SUPORTE A CONTROLE REMOTO D-PAD NA ANDROID TV
+            // Suporte ao controle remoto da Smart TV (D-Pad)
             webView.setFocusable(true);
             webView.setFocusableInTouchMode(true);
             webView.requestFocus();
 
             WebSettings settings = webView.getSettings();
 
-            // 2. CONFIGURAÇÕES DO PLAYER E REPRODUÇÃO
+            // Ativa recursos modernos de mídia e reprodução
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
-            settings.setMediaPlaybackRequiresUserGesture(false); // Autoplay sem clique físico
+            settings.setMediaPlaybackRequiresUserGesture(false);
 
-            // 3. BLOQUEIO DE ANÚNCIOS, POP-UPS E NOVAS ABAS
-            settings.setSupportMultipleWindows(false); // Impede que anúncios abram novas janelas
-            settings.setJavaScriptCanOpenWindowsAutomatically(false); // Bloqueia window.open()
+            // Permissões cruciais para streaming de vídeo (HLS / m3u8 / CORS)
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            settings.setAllowFileAccessFromFileURLs(true);
+            settings.setAllowUniversalAccessFromFileURLs(true);
+
+            // DISFARCE DO USER-AGENT: Faz o RedeCanais achar que é um navegador Chrome de PC puro
+            // Isso desativa verificações que bloqueiam WebView embutida
+            String defaultUA = settings.getUserAgentString();
+            String cleanUA = defaultUA.replace("; wv", "").replaceAll("Version\\\\/\\\\d+\\\\.\\\\d+", "");
+            settings.setUserAgentString(cleanUA);
+
+            // Permite que o site faça o teste de popups sem acusar bloqueio
+            settings.setSupportMultipleWindows(true);
+            settings.setJavaScriptCanOpenWindowsAutomatically(true);
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-            // 4. INTERCEPTADOR DE REDIRECIONAMENTOS EXTERNOS
-            webView.setWebViewClient(new WebViewClient() {
+            // SUPORTE A TELA CHEIA NATIVA + SUPRESSÃO DE POPUPS
+            webView.setWebChromeClient(new WebChromeClient() {
+                
+                // 1. TELA CHEIA: Permite que o player amplie para a TV toda ao dar Play
+                @Override
+                public void onShowCustomView(View view, CustomViewCallback callback) {
+                    if (customView != null) {
+                        callback.onCustomViewHidden();
+                        return;
+                    }
+                    customView = view;
+                    customViewCallback = callback;
+
+                    fullscreenContainer = new FrameLayout(MainActivity.this);
+                    fullscreenContainer.setBackgroundColor(0xFF000000);
+                    fullscreenContainer.addView(view, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    ));
+
+                    ViewGroup decorView = (ViewGroup) getWindow().getDecorView();
+                    decorView.addView(fullscreenContainer, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    ));
+
+                    webView.setVisibility(View.GONE);
+                }
+
+                @Override
+                public void onHideCustomView() {
+                    if (customView == null) return;
+
+                    ViewGroup decorView = (ViewGroup) getWindow().getDecorView();
+                    if (fullscreenContainer != null) {
+                        decorView.removeView(fullscreenContainer);
+                        fullscreenContainer = null;
+                    }
+
+                    customView = null;
+                    if (customViewCallback != null) {
+                        customViewCallback.onCustomViewHidden();
+                    }
+                    webView.setVisibility(View.VISIBLE);
+                }
+
+                // 2. SUPRIME JANELAS DE ANÚNCIOS SEM O SITE DESCONFIAR
+                @Override
+                public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                    WebView tempWebView = new WebView(view.getContext());
+                    tempWebView.setWebViewClient(new WebViewClient() {
+                        @Override
+                        public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest req) {
+                            return true; // Aborta qualquer link de anúncio que tentar abrir
+                        }
+                    });
+                    WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                    transport.setWebView(tempWebView);
+                    resultMsg.sendToTarget();
+                    return true; // O site acha que o popup abriu com sucesso!
+                }
+            });
+
+            // INTERCEPTADOR ESTILO UBLOCK ORIGIN (DEFUSER)
+            webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
+                @Override
+                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                    String url = request.getUrl().toString().toLowerCase();
+
+                    // NUNCA INTERCEPTAR arquivos de vídeo, streaming ou playlists
+                    if (url.contains(".m3u8") || url.contains(".ts") || url.contains(".mp4") || url.contains("blob:")) {
+                        return super.shouldInterceptRequest(view, request);
+                    }
+
+                    // Se o RedeCanais estiver testando a presença de scripts de anúncio:
+                    if (url.contains("ads.js") || url.contains("adsbygoogle") || 
+                        url.contains("popads") || url.contains("adblock")) {
+                        
+                        // DEVOLVE SUCESSO FALSO: O teste do site roda, acha que os anúncios existem e LIBERA O VÍDEO!
+                        return new WebResourceResponse(
+                            "application/javascript", 
+                            "UTF-8", 
+                            new ByteArrayInputStream(FAKE_ADS_JS.getBytes())
+                        );
+                    }
+
+                    // Se for redirect para casas de aposta ou redes maliciosas:
+                    if (url.contains("adclick") || url.contains("doubleclick") || 
+                        url.contains("bet365") || url.contains("1xbet") || url.contains("blaze") ||
+                        url.contains("monetag") || url.contains("propellerads")) {
+                        return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes()));
+                    }
+
+                    return super.shouldInterceptRequest(view, request);
+                }
+
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                    String url = request.getUrl().toString();
-                    
-                    // Bloqueia tentativas de abrir Play Store de anúncios ou redirects suspeitos
-                    if (url.startsWith("market://") || url.startsWith("intent://") || url.contains("adclick") || url.contains("doubleclick")) {
-                        return true; // Aborta e não abre na TV
+                    String url = request.getUrl().toString().toLowerCase();
+                    if (url.startsWith("intent://") || url.startsWith("market://")) {
+                        return true; // Não deixa abrir Play Store
                     }
-                    return false;
+                    return super.shouldOverrideUrlLoading(view, request);
                 }
             });
         }
     }
 
-    // 5. NAVEGAÇÃO DO BOTÃO 'VOLTAR' NO CONTROLE DA TV E CELULAR
+    // NAVEGAÇÃO DO BOTÃO 'VOLTAR' NO CONTROLE DA TV E CELULAR
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            // Se estiver em tela cheia de vídeo, fecha a tela cheia primeiro!
+            if (customView != null) {
+                if (fullscreenContainer != null) {
+                    ((ViewGroup) getWindow().getDecorView()).removeView(fullscreenContainer);
+                    fullscreenContainer = null;
+                }
+                customView = null;
+                if (customViewCallback != null) {
+                    customViewCallback.onCustomViewHidden();
+                }
+                webView.setVisibility(View.VISIBLE);
+                return true;
+            }
             if (webView != null && webView.canGoBack()) {
                 webView.goBack();
                 return true;
@@ -745,11 +883,13 @@ public class MainActivity extends BridgeActivity {
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#141414] border border-neutral-800 text-neutral-300 text-xs">
-                <strong className="text-white block mb-1">O que este código faz na prática:</strong>
+                <strong className="text-white block mb-1">O que este código faz na prática (Blindagem Estilo uBlock Origin):</strong>
                 <ul className="list-disc pl-5 space-y-1 text-neutral-400">
-                  <li><strong className="text-neutral-200">setFocusable(true)</strong>: Permite que as setas (cima, baixo, esquerda, direita) do controle remoto da TV naveguem naturalmente entre os canais.</li>
-                  <li><strong className="text-neutral-200">setSupportMultipleWindows(false)</strong>: Anúncios que tentam abrir novas janelas com cliques falsos são instantaneamente neutralizados.</li>
-                  <li><strong className="text-neutral-200">onKeyDown(KEYCODE_BACK)</strong>: Faz o botão 'Voltar' do controle retornar de um canal ou fechar modais em vez de encerrar o app abruptamente.</li>
+                  <li><strong className="text-neutral-200">Disfarce User-Agent (Chrome de PC)</strong>: Remove tags como <code className="text-cyan-400 bg-black/50 px-1 py-0.5 rounded">; wv</code> e <code className="text-cyan-400 bg-black/50 px-1 py-0.5 rounded">Version/4.0</code>, impedindo o RedeCanais de saber que roda em WebView de TV/Celular.</li>
+                  <li><strong className="text-neutral-200">Defuser FAKE_ADS_JS</strong>: Responde scripts iscas de anúncios com <code className="text-emerald-400 bg-black/50 px-1 py-0.5 rounded">canRunAds = true</code> e variáveis mock. O teste de detecção do site acha que o anúncio carregou e <strong>libera o player</strong>!</li>
+                  <li><strong className="text-neutral-200">WebViewTransport no onCreateWindow</strong>: Confirma a abertura de popups para o player sem abrir nenhuma janela na tela da TV ou Celular (destrói o popup em segundo plano).</li>
+                  <li><strong className="text-neutral-200">BridgeWebViewClient</strong>: Mantém a compatibilidade do Capacitor e evita telas brancas ao carregar os canais e o app React.</li>
+                  <li><strong className="text-neutral-200">Controle Remoto (D-Pad & KEYCODE_BACK)</strong>: Navegação natural pelas setas e volta de canais suavemente sem fechar o app.</li>
                 </ul>
               </div>
 

@@ -1,473 +1,209 @@
-# Manual Completo: Publicar no GitHub e Gerar App Android TV & Celular com Capacitor e Android Studio
+# NETPLAY: Manual de Criação e Compilação do Aplicativo (Android Studio + Capacitor + Smart TV)
 
-Este manual reúne todas as etapas e códigos necessários para versionar este projeto no **GitHub**, cloná-lo em qualquer computador e compilar o aplicativo nativo (**APK**) com suporte híbrido perfeito tanto para **Smart TVs (Android TV, Google TV, Fire TV, TV Boxes)** quanto para **Smartphones e Tablets Android**.
-
----
-
-## ÍNDICE RÁPIDO
-
-1. [O que deve e não deve ir pro Git (.gitignore)](#1-o-que-deve-e-não-deve-ir-pro-git-gitignore)
-2. [Como Enviar o Projeto para o GitHub](#2-como-enviar-o-projeto-para-o-github)
-3. [Como Clonar e Configurar em uma Nova Máquina](#3-como-clonar-e-configurar-em-uma-nova-máquina)
-4. [Instalação e Sincronização do Capacitor](#4-instalação-e-sincronização-do-capacitor)
-5. [Código 1: capacitor.config.json](#5-código-1-capacitorconfigjson)
-6. [Código 2: google-services.json na pasta app (Firebase)](#6-código-2-google-servicesjson-na-pasta-app-firebase)
-7. [Código 3: AndroidManifest.xml (Híbrido TV + Celular)](#7-código-3-androidmanifestxml-híbrido-tv--celular)
-8. [Código 4: MainActivity.java (D-Pad da TV + Bloqueio de Anúncios)](#8-código-4-mainactivityjava-d-pad-da-tv--bloqueio-de-anúncios)
-9. [Banner Obrigatório da Android TV (320x180 px)](#9-banner-obrigatório-da-android-tv-320x180-px)
-10. [Como Compilar o APK no Android Studio](#10-como-compilar-o-apk-no-android-studio)
-11. [Como Instalar na Smart TV e no Celular](#11-como-instalar-na-smart-tv-e-no-celular)
-12. [Rotina de Atualizações Futuras com o GitHub](#12-rotina-de-atualizações-futuras-com-o-github)
+Este manual técnico e arquitetural descreve a estrutura de criação e compilação do **NETPLAY** para **Smartphones Android** e **Smart TVs (Android TV, Google TV, Fire TV, TV Boxes)**, cobrindo o suporte nativo a **Filmes On-Demand (MP4)**, **Canais IPTV Ao Vivo (HLS .m3u8)**, navegação fluida por controle remoto **D-PAD**, **Gerenciador de Listas** e compilação de APKs de alto rendimento.
 
 ---
 
-## 1. O que deve e não deve ir pro Git (.gitignore)
+## 📑 ÍNDICE
 
-Para não poluir o repositório no GitHub com gigabytes de arquivos temporários, bibliotecas pesadas do Gradle e caminhos de SDK específicos da sua máquina, o arquivo `.gitignore` na raiz do projeto já está configurado:
-
-### Conteúdo do arquivo `/.gitignore`:
-```gitignore
-# Node & Dependências
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-bun.lockb
-
-# Build Web (Vite)
-dist/
-dist-ssr/
-build/
-coverage/
-
-# Variáveis de Ambiente
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-!.env.example
-
-# Arquivos temporários e SO
-.DS_Store
-Thumbs.db
-*.log
-
-# Android & Gradle (Capacitor)
-android/.gradle/
-android/build/
-android/app/build/
-android/captures/
-android/.cxx/
-android/local.properties
-
-# Android Studio & IDEs
-.idea/
-*.iml
-android/*.iml
-android/app/*.iml
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Pacotes de compilação Android (APKs e Bundles)
-*.apk
-*.aab
-*.keystore
-*.jks
-```
-
-> **Por que o arquivo `android/local.properties` é ignorado?**  
-> Porque ele grava o caminho absoluto do SDK no seu computador pessoal (ex: `C:\Users\Nome\AppData\Local\Android\Sdk`). Se for pro Git, causará erros em outras máquinas. O Android Studio recria esse arquivo automaticamente em cada computador!
+1. [Identidade e Especificações do App](#1-identidade-e-especificações-do-app)
+2. [Arquitetura Híbrida: Filmes On-Demand + IPTV Ao Vivo](#2-arquitetura-híbrida-filmes-on-demand--iptv-ao-vivo)
+3. [Design dos Componentes e Posicionamento de Categorias](#3-design-dos-componentes-e-posicionamento-de-categorias)
+4. [Engenharia de Navegação por Setas (D-PAD Android TV)](#4-engenharia-de-navegação-por-setas-d-pad-android-tv)
+5. [Sistema de Exclusão com Cards de Aviso no Sistema](#5-sistema-de-exclusão-com-cards-de-aviso-no-sistema)
+6. [Gerenciador de Listas e Canais IPTV](#6-gerenciador-de-listas-e-canais-iptv)
+7. [Player HLS e Exclusão de Canais Offline Durante Reprodução](#7-player-hls-e-exclusão-de-canais-offline-durante-reprodução)
+8. [Configurações Nativas Android (AndroidManifest, MainActivity e Capacitor)](#8-configurações-nativas-android-androidmanifest-mainactivity-e-capacitor)
+9. [Passo a Passo de Compilação do APK no Android Studio](#9-passo-a-passo-de-compilação-do-apk-no-android-studio)
+10. [Instalação e Testes na Smart TV e Celular](#10-instalação-e-testes-na-smart-tv-e-celular)
 
 ---
 
-## 2. Como Enviar o Projeto para o GitHub
+## 1. Identidade e Especificações do App
 
-1. Acesse o [GitHub](https://github.com) e crie um novo repositório vazio (ex: `canais-tv-app`). Não marque a opção de criar README ou .gitignore no GitHub (já temos aqui).
-2. Abra o terminal na pasta raiz do seu projeto no computador e rode os comandos:
+- **Nome Oficial:** `NETPLAY`
+- **Application ID:** `com.netplay.app`
+- **Padrão de Cores:**
+  - Fundo Primário: Branco Puro (`#FFFFFF`) e Cinza Suave (`#F8F9FA`)
+  - Painéis Cinematográficos: Preto Ônix (`#000000`, `#141414`, `#1A0808`)
+  - Cor de Acento e Foco: Vermelho Vibrante NetPlay (`#E50914`)
+  - Tipografia: Outfit / Sans-Serif de Alta Legibilidade
+- **Suporte de Mídia:**
+  - Filmes: Arquivos de vídeo `.mp4` Full HD / 4K / Webm
+  - IPTV: Transmissões contínuas HLS (`.m3u8`), TS streams e RTMP
 
-```bash
-# Iniciar o repositório git local (se ainda não tiver iniciado)
-git init
+---
 
-# Definir a branch principal como main
-git branch -M main
+## 2. Arquitetura Híbrida: Filmes On-Demand + IPTV Ao Vivo
 
-# Adicionar todos os arquivos do projeto (o .gitignore protegerá os arquivos temporários)
-git add .
+O NETPLAY é estruturado em React 18 + Vite com TypeScript e Tailwind CSS:
 
-# Criar o primeiro commit
-git commit -m "feat: configuracao inicial do app canais tv com capacitor e suporte android tv"
-
-# Vincular ao seu repositório no GitHub (substitua pelo seu link do GitHub)
-git remote add origin https://github.com/SEU_USUARIO/canais-tv-app.git
-
-# Enviar os arquivos para o GitHub
-git push -u origin main
+```text
+src/
+├── components/
+│   ├── NetflixMoviesApp.tsx       <- Container principal e roteamento entre abas
+│   ├── IptvView.tsx               <- Visão de grade de canais e banner hero IPTV
+│   ├── IptvManagerView.tsx        <- Gerenciador completo de listas e canais
+│   ├── IptvPlayer.tsx             <- Player HLS com menu de canais e exclusão ao vivo
+│   ├── NativeMoviePlayer.tsx      <- Player nativo cinema com salvamento de progresso
+│   ├── AddMovieModal.tsx          <- Cadastro e edição de filmes MP4
+│   ├── AddIptvChannelModal.tsx    <- Cadastro unitário e importador de listas M3U
+│   ├── BatchImportModal.tsx       <- Importador em lote de filmes via CSV / Excel
+│   ├── DeviceGuideModal.tsx       <- Manual de uso embutido na interface
+│   └── LinkDiagnosticsModal.tsx   <- Painel de diagnóstico de links e renovação de tokens
+├── types/
+│   ├── movies.ts                  <- Tipagem de filmes, categorias e progresso
+│   └── iptv.ts                    <- Tipagem de canais IPTV, listas e qualidades
+└── utils/
+    ├── moviesCatalogStorage.ts    <- Persistência e catálogo de filmes
+    ├── iptvStorage.ts             <- Persistência de canais IPTV e listas
+    ├── iptvParser.ts              <- Parser avançado M3U/M3U8 com detecção de grupos
+    └── playerSecurity.ts          <- Sanitização e aceleração de vídeo
 ```
 
 ---
 
-## 3. Como Clonar e Configurar em uma Nova Máquina
+## 3. Design dos Componentes e Posicionamento de Categorias
 
-Se você for gerar o APK em outro computador (ou se clonar o repositório futuramente), execute:
-
-```bash
-# 1. Clonar o repositório
-git clone https://github.com/SEU_USUARIO/canais-tv-app.git
-cd canais-tv-app
-
-# 2. Instalar as dependências do Node
-npm install
-```
+A interface foi refinada para máxima usabilidade:
+1. **Cabeçalho Limpo:** Foram retiradas todas as categorias horizontais do topo. O cabeçalho abriga exclusivamente a marca NETPLAY, o alternador de abas `[🎬 Filmes]` / `[📺 IPTV]`, a busca rápida e os botões de ação (`Guia`, `Lote/M3U`, `Links`, `+ Adicionar`).
+2. **Categorias Estratégicas:** Tanto no modo de Filmes quanto no modo IPTV, a barra de categorias fica posicionada **abaixo do banner hero de destaque e logo acima do catálogo de cards**.
+3. **Alto Contraste e Acessibilidade:** Botões e cards possuem anéis de seleção vibrantes (`ring-4 ring-[#E50914]`) permitindo fácil identificação visual em telas de 40 a 75 polegadas.
 
 ---
 
-## 4. Instalação e Sincronização do Capacitor
+## 4. Engenharia de Navegação por Setas (D-PAD Android TV)
 
-Com as dependências instaladas, inicialize o ambiente Android nativo com os comandos:
+Para dispensar completamente mouses virtuais (*air-mouse*), o arquivo `NetflixMoviesApp.tsx` implementa uma máquina de estados de navegação D-PAD com **4 zonas físicas ordenadas**:
 
-```bash
-# 1. Instalar os pacotes nativos do Capacitor
-npm install @capacitor/core @capacitor/cli @capacitor/android
-
-# 2. Gerar a pasta 'dist' otimizada da aplicação Web
-npm run build
-
-# 3. Adicionar o módulo nativo do Android (cria a pasta 'android/')
-# (Nota: execute este comando se a pasta 'android/' ainda não existir no projeto)
-npx cap add android
-
-# 4. Sincronizar o build Web com o projeto nativo do Android
-npx cap sync android
-
-# 5. Abrir o projeto diretamente dentro do Android Studio
-npx cap open android
+```text
+[ ZONA 1: HEADER ]        -> Filmes ↔ IPTV ↔ Buscar ↔ Guia ↔ Lote ↔ Links ↔ Adicionar
+       ↕
+[ ZONA 2: HERO BANNER ]    -> Assistir Destaque ↔ Editar/Favoritar
+       ↕
+[ ZONA 3: CATEGORIAS ]     -> Todos ↔ Gênero 1 ↔ Gênero 2 ↔ Gênero 3...
+       ↕
+[ ZONA 4: GRADE DE CARDS ] -> [ Card Anterior ↔ Card Atual ↔ Próximo Card ]
+                               [ Ações: Assistir ↔ Favoritar ↔ Editar ↔ Excluir ]
 ```
+
+### Comportamento Geométrico da Grade
+- A função `getGridColumns()` calcula em tempo real o número exato de colunas visíveis no monitor da Smart TV.
+- Pressionar **Seta Abaixo (↓)** salta exatamente uma linha física (`index + cols`).
+- Pressionar **Seta Acima (↑)** sobe geometricamente (`index - cols`); se estiver na primeira linha física, transfere o foco suavemente para a barra de Categorias.
+- As teclas físicas **MENU** e **DELETE** do controle remoto acionam diretamente a edição ou exclusão do item focado.
 
 ---
 
-## 5. Código 1: `capacitor.config.json`
+## 5. Sistema de Exclusão com Cards de Aviso no Sistema
 
-Verifique se o arquivo `capacitor.config.json` na raiz do projeto está configurado exatamente assim. Ele autoriza o tráfego misto (HTTP/HTTPS) e garante que as URLs dos streams de canais funcionem sem bloqueios de segurança do sistema:
+Para cumprir as diretrizes de experiência nativa e evitar os alertas cinzas padrões dos navegadores (`window.confirm`), o sistema utiliza um **Card de Aviso no Sistema**:
+- **Design:** Modal centralizado com borda vermelha vibrante, ícone de lixeira e o nome do filme ou canal em destaque com fundo claro e tipografia preta.
+- **Teclado e Controle:** Foco padrão no botão de cancelamento (`Cancelar`), permitindo confirmar (`Sim, Excluir`) pelas setas horizontais do controle e tecla Enter. Tecla Voltar/Back fecha o card imediatamente.
+- **Segurança de Operação:** Aplicado de forma padronizada em exclusões de filmes, exclusões unitárias de canais IPTV, exclusões em lote e exclusões de listas completas.
 
+---
+
+## 6. Gerenciador de Listas e Canais IPTV
+
+O componente `IptvManagerView.tsx` foi desenvolvido especialmente para listas volumosas:
+1. **Visão por Listas & Grupos:**
+   - Lista todas as listas M3U importadas com contagem de canais.
+   - Opção para **Deletar Lista Completa** de uma só vez com confirmação segura.
+   - Opção para expandir uma lista, marcar canais específicos com checkboxes e excluir apenas os selecionados da lista X.
+2. **Visão de Todos os Canais:**
+   - Listagem completa de todos os canais cadastrados no app.
+   - Ações de seleção múltipla global para remoção em massa.
+   - Botão **Limpar Todos os Canais** para restaurar a grade a zero.
+3. **Busca Universal:**
+   - A pesquisa por texto busca instantaneamente em múltiplos campos: nome do canal, categoria, URL e nome da lista de origem. Ao pesquisar "Canal X", todos os canais com esse nome são retornados, mesmo que venham de listas diferentes ou tenham sido cadastrados individualmente.
+
+---
+
+## 7. Player HLS e Exclusão de Canais Offline Durante Reprodução
+
+O componente `IptvPlayer.tsx` utiliza a biblioteca de alta performance `Hls.js` integrada ao elemento `<video>` nativo do HTML5:
+1. **Tratamento de Quedas de Sinal:** Se um link estiver indisponível ou fora do ar, o player exibe uma tela amigável com o botão de destaque:
+   `[🗑️ Excluir Canal Fora do Ar]`.
+2. **Remoção sem Interrupção:** Ao clicar em excluir, o canal é eliminado do armazenamento e o player avança automaticamente para o próximo canal da lista.
+3. **Acesso Rápido:** Um botão de lixeira fica disponível na barra superior OSD e em cada canal dentro da gaveta lateral de canais (tecla **C**).
+4. **Atalho Remoto:** Pressionar a tecla **DELETE** no controle remoto durante a reprodução aciona o card de aviso para remoção rápida do canal defeituoso.
+
+---
+
+## 8. Configurações Nativas Android (AndroidManifest, MainActivity e Capacitor)
+
+### capacitor.config.json
 ```json
 {
-  "appId": "com.canaistv.app",
-  "appName": "Canais TV",
+  "appId": "com.netplay.app",
+  "appName": "NETPLAY",
   "webDir": "dist",
+  "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https",
     "cleartext": true,
-    "allowNavigation": [
-      "*.redecanaistv.af",
-      "redecanaistv.af",
-      "*.redecanais.*",
-      "*"
-    ]
+    "allowNavigation": ["*"]
   },
   "android": {
     "allowMixedContent": true,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": true
   }
 }
 ```
 
----
+### AndroidManifest.xml (Híbrido Smartphone + Smart TV)
+- Touchscreen declarado como não obrigatório para permitir instalação em TVs:
+  ```xml
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+  <uses-feature android:name="android.software.leanback" android:required="false" />
+  ```
+- Banner de TV no manifesto:
+  ```xml
+  android:banner="@drawable/tv_banner"
+  android:usesCleartextTraffic="true"
+  android:hardwareAccelerated="true"
+  ```
 
-## 6. Código 2: `google-services.json` na pasta app (Firebase)
-
-O projeto Firebase foi criado no console com o ID: **`micro-catcher-mpthm`**.
-
-O arquivo `google-services.json` é o arquivo oficial que o plugin do Google Services do Gradle lê no Android Studio. Ele deve ficar localizado na pasta do módulo do app:
-
-📁 **Caminho:** `android/app/google-services.json`  
-*(Também criamos uma cópia em `app/google-services.json` e na raiz do projeto).*
-
-### Conteúdo do `google-services.json`:
-```json
-{
-  "project_info": {
-    "project_number": "88349835370",
-    "project_id": "micro-catcher-mpthm",
-    "storage_bucket": "micro-catcher-mpthm.firebasestorage.app"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:88349835370:android:8af9985f745c5246230a13",
-        "android_client_info": {
-          "package_name": "com.canaistv.app"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDhp3AovgFu23w6SdknzvWrPBEmBHmR7FI"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "88349835370-5hu1uhpqp30g101ivilk8406gb6iv66t.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
-}
-```
+### MainActivity.java (Despacho de Teclas D-PAD e Vídeo)
+- Configuração do WebView com decodificação por hardware, mixed content e repasse de teclas:
+  ```java
+  webView.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+  webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+  ```
 
 ---
 
-## 7. Código 3: `AndroidManifest.xml` (Híbrido TV + Celular)
+## 9. Passo a Passo de Compilação do APK no Android Studio
 
-Localização do arquivo:
-`android/app/src/main/AndroidManifest.xml`
-
-Substitua todo o conteúdo do arquivo pelo código abaixo. Este manifesto é o segredo para o aplicativo ser aceito e funcionar perfeitamente em **dois mundos diferentes**:
-
-- **Na Android TV**: Ativa o `LEANBACK_LAUNCHER` (para aparecer no carrossel de apps da TV) e define que o Touchscreen **não é obrigatório** (`android:required="false"`).
-- **No Celular**: Ativa o `LAUNCHER` tradicional e define que o Leanback **não é obrigatório** (`android:required="false"`).
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- Permissões de Conexão à Internet e Rede -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-
-    <!-- 
-      CONFIGURAÇÃO HÍBRIDA MULTI-DISPOSITIVO:
-      A flag 'android:required="false"' é INDISPENSÁVEL. 
-      Ela permite instalar o app em TVs sem tela de toque e em Celulares sem sistema Leanback.
-    -->
-    <uses-feature
-        android:name="android.software.leanback"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.touchscreen"
-        android:required="false" />
-    <uses-feature
-        android:name="android.hardware.wifi"
-        android:required="false" />
-
-    <application
-        android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme"
-        android:hardwareAccelerated="true"
-        android:usesCleartextTraffic="true"
-        android:banner="@drawable/banner">
-
-        <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
-            android:name=".MainActivity"
-            android:label="@string/title_activity_main"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:launchMode="singleTask"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize">
-
-            <!-- 1. ÍCONE PARA CELULARES E TABLETS ANDROID -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <!-- 2. ÍCONE NO CARROSSEL PRINCIPAL DA ANDROID TV / GOOGLE TV / FIRE TV -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
-
-        </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
-        </provider>
-    </application>
-
-</manifest>
-```
+1. **Gere o build dos arquivos estáticos:**
+   ```bash
+   npm run build
+   ```
+2. **Sincronize com a pasta nativa Android:**
+   ```bash
+   npx cap sync android
+   ```
+3. **Abra o projeto no Android Studio:**
+   ```bash
+   npx cap open android
+   ```
+4. **No Android Studio:**
+   - Aguarde a sincronização do Gradle (*Gradle Sync Finished*).
+   - No menu superior, vá em **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
+   - Ao concluir, clique em **locate** para pegar o arquivo `app-debug.apk`.
 
 ---
 
-## 7. Código 3: `MainActivity.java` (D-Pad da TV + Bloqueio de Anúncios)
+## 10. Instalação e Testes na Smart TV e Celular
 
-Localização do arquivo:
-`android/app/src/main/java/com/canaistv/app/MainActivity.java`
+### Na Smart TV (Android TV, TV Box, Fire TV):
+1. Copie o arquivo `app-debug.apk` para um pendrive ou envie via aplicativo **Send Files to TV**.
+2. Abra um gerenciador de arquivos na TV (ex: *X-plore* ou *File Commander*) e instale o APK.
+3. O ícone oficial do **NETPLAY** aparecerá na fileira principal de aplicativos com o banner 16:9 de cinema.
+4. Navegue 100% pelas setas do controle remoto!
 
-Substitua todo o conteúdo pelo código abaixo. Ele ativa:
-1. Navegação nativa via setas (D-Pad) do controle remoto da TV.
-2. Autoplay contínuo para os vídeos começarem sem necessitar de toque físico.
-3. Desativação de múltiplas janelas e pop-ups para que propagandas de sites de canais não travem a TV.
-4. Mapeamento do botão "Voltar" do controle remoto.
-
-```java
-package com.canaistv.app;
-
-import android.os.Bundle;
-import android.view.KeyEvent;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {
-
-    private WebView webView;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        // Obtém o componente WebView do Capacitor
-        webView = this.bridge.getWebView();
-
-        if (webView != null) {
-            // 1. SUPORTE TOTAL AO CONTROLE REMOTO (D-PAD) DA ANDROID TV
-            webView.setFocusable(true);
-            webView.setFocusableInTouchMode(true);
-            webView.requestFocus();
-
-            WebSettings settings = webView.getSettings();
-
-            // 2. CONFIGURAÇÃO DE REPRODUÇÃO DE VÍDEO
-            settings.setJavaScriptEnabled(true);
-            settings.setDomStorageEnabled(true);
-            settings.setDatabaseEnabled(true);
-            settings.setMediaPlaybackRequiresUserGesture(false); // Autoplay sem clique físico
-
-            // 3. BLOQUEIO DE POP-UPS, ANÚNCIOS E MÚLTIPLAS JANELAS
-            settings.setSupportMultipleWindows(false); // Impede que anúncios abram novas abas
-            settings.setJavaScriptCanOpenWindowsAutomatically(false); // Bloqueia window.open()
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-            // 4. INTERCEPTADOR DE REDIRECIONAMENTOS EXTERNOS MALICIOSOS
-            webView.setWebViewClient(new WebViewClient() {
-                @Override
-                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                    String url = request.getUrl().toString();
-                    
-                    // Bloqueia tentativas de redirecionar para a Play Store ou sites de anúncios
-                    if (url.startsWith("market://") || url.startsWith("intent://") || url.contains("adclick") || url.contains("doubleclick")) {
-                        return true; // Aborta a abertura
-                    }
-                    return false;
-                }
-            });
-        }
-    }
-
-    // 5. NAVEGAÇÃO COM O BOTÃO 'VOLTAR' NO CONTROLE REMOTO DA TV
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (webView != null && webView.canGoBack()) {
-                webView.goBack();
-                return true;
-            }
-        }
-        return super.onKeyDown(keyCode, event);
-    }
-}
-```
-
-### 💡 Por que o RedeCanais exibia "Página Bloqueada" e como foi resolvido:
-- **Causa da Detecção:** O player do RedeCanais possui um script de proteção que inspeciona o elemento `<iframe>`. Se ele detectar um atributo HTML `sandbox` restritivo bloqueando popups, o site assume que é um bloqueador de anúncios agressivo e substitui o vídeo pela tela de alerta *"Página Bloqueada! Os Espertinhos sempre se ferra!..."*.
-- **Solução no App:**
-  1. O aplicativo agora adota o **Modo Direto (Anti-Bloqueio)** como padrão. Ele renderiza o `<iframe>` sem restrições de sandbox no HTML, permitindo que o script do player inicialize 100% liso.
-  2. No APK Android, a proteção contra popups indesejados é feita **nativamente na WebView** através das configurações da `MainActivity.java` (`setSupportMultipleWindows(false)` e `shouldOverrideUrlLoading`). Dessa forma, nenhum anúncio externo ou popup consegue abrir no app, e o site nunca descobre nem bloqueia a transmissão!
-  3. No player web, há também o seletor com botão de modo e um botão rápido *"Liberar Player"* caso o usuário queira alternar entre Modo Direto, Tolerante ou Estrito a qualquer momento.
-
----
-
-## 8. Banner Obrigatório da Android TV (320x180 px)
-
-A Android TV e o Google TV exigem um banner retangular na proporção **16:9** (tamanho exato: **320 x 180 pixels**) para exibir o card do app na grade da TV.
-
-1. Crie ou salve uma imagem retangular de **320x180 px** (formato PNG) com o logo ou nome "Canais TV".
-2. Salve o arquivo com o nome exato: `banner.png`.
-3. Coloque esse arquivo na pasta:
-   `android/app/src/main/res/drawable/banner.png`
-
-*(Se essa pasta `drawable` não existir dentro de `res`, pode criá-la).*
-
----
-
-## 9. Como Compilar o APK no Android Studio
-
-1. Abra o projeto no Android Studio rodando `npx cap open android`.
-2. Aguarde o Gradle sincronizar os arquivos (barra de progresso no canto inferior).
-3. No menu superior do Android Studio, clique em:  
-   **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
-4. Quando a compilação terminar, uma notificação aparecerá no canto inferior direito:  
-   *`APK(s) generated successfully for 1 module: Locate`*.
-5. Clique no link azul **Locate**.
-6. Ele abrirá a pasta contendo o arquivo compilado: **`app-debug.apk`**.
-
----
-
-## 10. Como Instalar na Smart TV e no Celular
-
-### Na Smart TV / TV Box (Opção 1 - Pen Drive USB)
-1. Copie o arquivo `app-debug.apk` para um pen drive.
-2. Plugue o pen drive na porta USB da sua TV Box ou Smart TV.
-3. Abra um gerenciador de arquivos na TV (ex: *File Commander*, *X-plore* ou *AnExplorer*).
-4. Clique no arquivo `app-debug.apk` e selecione **Instalar**.
-
-### No Fire TV Stick / Chromecast / Android TV (Opção 2 - App Downloader)
-1. Na loja de apps da TV, instale o aplicativo gratuito **Downloader** (da AFTVnews).
-2. Faça upload do seu arquivo `app-debug.apk` no Google Drive, Mediafire ou qualquer serviço com link direto.
-3. Abra o app Downloader na TV, digite o link direto do APK e aperte **Go**.
-4. O app será baixado e instalado diretamente pela tela da TV.
-
-### No Smartphone Android
-1. Envie o arquivo `app-debug.apk` para o celular (via WhatsApp, Telegram, Google Drive ou cabo USB).
-2. Toque no arquivo e clique em **Instalar** (permita a instalação de fontes desconhecidas se solicitado).
-
----
-
-## 11. Rotina de Atualizações Futuras com o GitHub
-
-Sempre que você cadastrar novos canais ou fizer melhorias visuais no código:
-
-```bash
-# 1. Enviar as novidades para o GitHub:
-git add .
-git commit -m "update: novos canais adicionados"
-git push
-
-# 2. Gerar o novo APK para sua TV:
-npm run build
-npx cap sync android
-```
-Depois abra o Android Studio (`npx cap open android`) e clique novamente em **Build APK(s)**!
+### No Celular Android:
+1. Envie o APK para o smartphone (via WhatsApp, Telegram ou Google Drive).
+2. Toque no arquivo e confirme a instalação (ativando fontes desconhecidas se solicitado).
+3. O app se adaptará com rolagem vertical, toque tátil e modo paisagem automático.
