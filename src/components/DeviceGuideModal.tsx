@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Smartphone, Tv, CheckCircle2, HelpCircle, X, ShieldAlert, Zap, Film, Sparkles } from 'lucide-react';
+import { Smartphone, Tv, CheckCircle2, HelpCircle, X, ShieldAlert, Zap, Film, Sparkles, FolderDown, Download, Laptop } from 'lucide-react';
 import { useModalArrowNavigation } from '../hooks/useModalArrowNavigation';
 
 interface DeviceGuideModalProps {
@@ -266,6 +266,41 @@ export const DeviceGuideModal: React.FC<DeviceGuideModalProps> = ({ isOpen, onCl
                 Se algum servidor renovar o token de autenticação temporário do filme, abra os detalhes do filme, clique no ícone da caneta <strong>[✏️ Editar]</strong> e substitua o link. O filme permanece no catálogo com todo o histórico preservado!
               </p>
             </div>
+          </div>
+
+          {/* Sessão 5: Criar App Android TV & Celular via ZIP Local no PC */}
+          <div className="bg-neutral-900 text-white border-2 border-cyan-500/40 p-5 rounded-2xl shadow-md">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-cyan-600 flex items-center justify-center text-white shadow-[0_0_12px_rgba(6,182,212,0.6)]">
+                <FolderDown className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wide flex items-center gap-1.5 text-white font-['Outfit']">
+                  Criar App Android (Smart TV & Celular) via ZIP Local no PC
+                </h3>
+                <span className="text-[10px] text-cyan-300 font-semibold">
+                  Sem necessidade de GitHub! Baixe o ZIP, abra a pasta no PC e gere o APK no Android Studio
+                </span>
+              </div>
+            </div>
+
+            <ol className="space-y-2 text-[11px] leading-relaxed text-neutral-300 list-decimal pl-5">
+              <li>
+                <strong className="text-white">Baixar o ZIP:</strong> No topo da página do AI Studio, clique em baixar / exportar o projeto como arquivo ZIP e extraia em uma pasta no seu PC (ex: <code className="text-cyan-300">C:\netplay</code>).
+              </li>
+              <li>
+                <strong className="text-white">Comandos no Terminal:</strong> Abra o terminal na pasta descompactada e rode:
+                <pre className="mt-1.5 p-2.5 bg-black rounded-lg font-mono text-[10px] text-cyan-300 border border-neutral-800">
+                  npm install && npm run build && npx cap sync android
+                </pre>
+              </li>
+              <li>
+                <strong className="text-white">Abrir no Android Studio:</strong> Abra o Android Studio no seu PC, vá em <strong>File &gt; Open</strong> e selecione a pasta <strong>android</strong> do projeto (ou digite <code className="text-cyan-300">npx cap open android</code>).
+              </li>
+              <li>
+                <strong className="text-white">Gerar o APK:</strong> No Android Studio, aguarde o Gradle Sync e clique em <strong>Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</strong>. O arquivo <code className="text-emerald-400">app-debug.apk</code> estará pronto para ser transferido via Pen Drive ou Send Files to TV para sua TV e Celular!
+              </li>
+            </ol>
           </div>
         </div>
 

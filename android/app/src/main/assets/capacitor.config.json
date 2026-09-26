@@ -1,0 +1,14 @@
+{
+	"appId": "com.netplay.app",
+	"appName": "NETPLAY",
+	"webDir": "dist",
+	"server": {
+		"cleartext": true,
+		"androidScheme": "https"
+	},
+	"android": {
+		"allowMixedContent": true,
+		"captureInput": true,
+		"webContentsDebuggingEnabled": false
+	}
+}

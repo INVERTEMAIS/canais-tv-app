@@ -12,8 +12,9 @@ import {
   FolderTree,
   ExternalLink,
   Laptop,
-  GitBranch,
-  Github
+  FolderDown,
+  FolderArchive,
+  HardDrive
 } from 'lucide-react';
 
 interface AndroidAdBlockModalProps {
@@ -21,10 +22,10 @@ interface AndroidAdBlockModalProps {
   onClose: () => void;
 }
 
-type GuideTab = 'github_flow' | 'google_services' | 'terminal' | 'manifest' | 'main_activity' | 'capacitor_config' | 'export_apk';
+type GuideTab = 'zip_local' | 'google_services' | 'terminal' | 'manifest' | 'main_activity' | 'capacitor_config' | 'export_apk';
 
 export const AndroidAdBlockModal: React.FC<AndroidAdBlockModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<GuideTab>('github_flow');
+  const [activeTab, setActiveTab] = useState<GuideTab>('zip_local');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -35,23 +36,22 @@ export const AndroidAdBlockModal: React.FC<AndroidAdBlockModalProps> = ({ isOpen
     setTimeout(() => setCopiedSection(null), 2500);
   };
 
-  const gitCommands = `# 1. Inicializar o repositório Git local
-git init
+  const localSetupCommands = `# 1. Abra o terminal (Prompt de Comando / PowerShell no Windows ou Terminal no Mac/Linux)
+# Navegue até a pasta onde você descompactou o ZIP do NETPLAY:
+cd C:\\projetos\\netplay    # (exemplo Windows)
+# ou no Linux/Mac: cd ~/projetos/netplay
 
-# 2. Definir a branch principal como main
-git branch -M main
+# 2. Instalar todas as dependências do projeto (Capacitor já configurado):
+npm install
 
-# 3. Adicionar todos os arquivos do projeto (o .gitignore protegerá os arquivos temporários)
-git add .
+# 3. Gerar o build da aplicação Web:
+npm run build
 
-# 4. Fazer o commit inicial
-git commit -m "feat: configuracao inicial do app canais tv com capacitor e suporte android tv"
+# 4. Sincronizar o build web com o projeto nativo Android:
+npx cap sync android
 
-# 5. Conectar ao seu repositório no GitHub (substitua com o link do seu repo)
-git remote add origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-
-# 6. Enviar para o GitHub
-git push -u origin main`;
+# 5. Abrir o projeto diretamente no Android Studio:
+npx cap open android`;
 
   const gitignoreCode = `# Node & Dependências
 node_modules/
@@ -106,27 +106,22 @@ android/app/*.iml
 *.keystore
 *.jks`;
 
-  const cloneCommands = `# Em um computador novo ou após baixar do GitHub:
-git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-cd SEU_REPOSITORIO
+  const localTerminalCommands = `# Comandos para executar na pasta local do projeto descompactado:
 
 # 1. Instalar as dependências do projeto
 npm install
 
-# 2. Instalar dependências nativas do Capacitor
-npm install @capacitor/core @capacitor/cli @capacitor/android
-
-# 3. Gerar a build de produção Web
+# 2. Gerar a build de produção Web
 npm run build
 
-# 4. Adicionar a plataforma Android (se for a 1ª vez criando a pasta android)
-npx cap add android
-
-# 5. Sincronizar o código Web com o Android Studio
+# 3. Sincronizar o código Web com a pasta nativa Android
 npx cap sync android
 
-# 6. Abrir o projeto diretamente no Android Studio
-npx cap open android`;
+# 4. Abrir o projeto diretamente no Android Studio
+npx cap open android
+
+# Ou se preferir, abra o Android Studio manualmente:
+# Menu "File > Open" e selecione a subpasta "android" do projeto!`;
 
   const googleServicesJsonCode = `{
   "project_info": {
@@ -478,14 +473,14 @@ public class MainActivity extends BridgeActivity {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base md:text-lg font-extrabold text-white">
-                  Manual de Publicação GitHub, Capacitor & Android Studio
+                  Manual de Criação do App: ZIP Local, Capacitor & Android Studio
                 </h2>
                 <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700">
                   Android TV + Celular
                 </span>
               </div>
               <p className="text-xs text-neutral-400 mt-0.5">
-                Passo a passo completo com arquivos prontos para salvar no Git e compilar o APK
+                Passo a passo completo para baixar o ZIP, abrir a pasta local no PC e compilar o APK no Android Studio
               </p>
             </div>
           </div>
@@ -503,15 +498,15 @@ public class MainActivity extends BridgeActivity {
         <div className="flex border-b border-neutral-800 bg-[#0a0a0a] px-4 md:px-6 overflow-x-auto shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab('github_flow')}
+            onClick={() => setActiveTab('zip_local')}
             className={`py-3 px-4 font-bold text-xs tracking-wider transition-all border-b-2 flex items-center gap-2 shrink-0 cursor-pointer ${
-              activeTab === 'github_flow'
+              activeTab === 'zip_local'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-neutral-400 hover:text-white'
             }`}
           >
-            <Github className="w-4 h-4" />
-            <span>1. GitHub & .gitignore</span>
+            <FolderDown className="w-4 h-4" />
+            <span>1. Baixar ZIP & Pasta Local</span>
           </button>
 
           <button
@@ -524,7 +519,7 @@ public class MainActivity extends BridgeActivity {
             }`}
           >
             <Terminal className="w-4 h-4" />
-            <span>2. Comandos do Capacitor</span>
+            <span>2. Comandos no Terminal</span>
           </button>
 
           <button
@@ -595,32 +590,65 @@ public class MainActivity extends BridgeActivity {
 
         {/* Tab Content Body */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 text-neutral-300 text-xs">
-          {/* TAB 1: GITHUB & GITIGNORE */}
-          {activeTab === 'github_flow' && (
+          {/* TAB 1: BAIXAR ZIP & PASTA LOCAL NO PC */}
+          {activeTab === 'zip_local' && (
             <div className="space-y-5 max-w-4xl">
               <div>
                 <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Github className="w-4 h-4 text-cyan-400" />
-                  <span>Passo 1: Subir para o GitHub e Configurar o .gitignore</span>
+                  <FolderDown className="w-4 h-4 text-cyan-400" />
+                  <span>Passo 1: Baixar o ZIP e Abrir a Pasta Local no seu PC</span>
                 </h3>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  O arquivo <code className="text-cyan-300">.gitignore</code> já foi criado na raiz do seu projeto para proteger os arquivos e evitar subir gigabytes de caches do Android e Gradle.
+                  Não é necessário usar GitHub! Você baixa o projeto como arquivo ZIP, descompacta no seu computador e executa tudo localmente.
                 </p>
               </div>
 
-              {/* Sub-seção A: Comandos Git */}
+              {/* Card de 3 Passos Iniciais */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-[#141414] border border-neutral-800 space-y-1.5">
+                  <div className="w-6 h-6 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-800 flex items-center justify-center font-bold text-xs">
+                    1
+                  </div>
+                  <strong className="text-white text-xs block">Baixar o ZIP</strong>
+                  <p className="text-neutral-400 text-[11px] leading-relaxed">
+                    No menu superior da barra do AI Studio, clique em baixar / exportar o arquivo ZIP completo do projeto.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#141414] border border-neutral-800 space-y-1.5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center justify-center font-bold text-xs">
+                    2
+                  </div>
+                  <strong className="text-white text-xs block">Extrair no seu PC</strong>
+                  <p className="text-neutral-400 text-[11px] leading-relaxed">
+                    Extraia o conteúdo em qualquer pasta local (ex: <code className="text-emerald-300 font-mono">C:\netplay</code> no Windows ou <code className="text-emerald-300 font-mono">~/netplay</code> no Linux/Mac).
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#141414] border border-neutral-800 space-y-1.5">
+                  <div className="w-6 h-6 rounded-lg bg-purple-950 text-purple-300 border border-purple-800 flex items-center justify-center font-bold text-xs">
+                    3
+                  </div>
+                  <strong className="text-white text-xs block">Abrir Terminal</strong>
+                  <p className="text-neutral-400 text-[11px] leading-relaxed">
+                    Abra o Prompt de Comando (CMD) ou PowerShell na pasta descompactada e rode os comandos abaixo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Sub-seção A: Comandos de Inicialização Local */}
               <div className="p-4 rounded-xl bg-[#141414] border border-neutral-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white text-xs flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-cyan-400" />
-                    <span>Comandos no Terminal para Enviar ao GitHub:</span>
+                    <span>Comandos no Terminal da sua Pasta Local:</span>
                   </span>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard(gitCommands, 'gitCommands')}
+                    onClick={() => copyToClipboard(localSetupCommands, 'localSetupCommands')}
                     className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-neutral-700"
                   >
-                    {copiedSection === 'gitCommands' ? (
+                    {copiedSection === 'localSetupCommands' ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-400" />
                         <span className="text-emerald-400">Copiado!</span>
@@ -628,60 +656,31 @@ public class MainActivity extends BridgeActivity {
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Copiar Comandos Git</span>
+                        <span>Copiar Comandos</span>
                       </>
                     )}
                   </button>
                 </div>
                 <pre className="rounded-lg bg-black border border-neutral-800 p-3 font-mono text-cyan-300 overflow-x-auto text-[11px] leading-relaxed">
-                  {gitCommands}
+                  {localSetupCommands}
                 </pre>
               </div>
 
-              {/* Sub-seção B: Arquivo .gitignore */}
-              <div className="p-4 rounded-xl bg-[#141414] border border-neutral-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-white text-xs flex items-center gap-2">
-                      <FolderTree className="w-4 h-4 text-emerald-400" />
-                      <span>Conteúdo do Arquivo .gitignore (Raiz do Projeto)</span>
-                    </span>
-                    <p className="text-[11px] text-neutral-400 mt-0.5">
-                      Ignora <code className="text-white">node_modules</code>, <code className="text-white">dist</code>, <code className="text-white">android/.gradle</code> e <code className="text-white">local.properties</code>.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(gitignoreCode, 'gitignoreCode')}
-                    className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-neutral-700"
-                  >
-                    {copiedSection === 'gitignoreCode' ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Copiado!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Copiar .gitignore</span>
-                      </>
-                    )}
-                  </button>
+              {/* Sub-seção B: Como Abrir no Android Studio */}
+              <div className="p-4 rounded-xl bg-cyan-950/40 border border-cyan-800/60 text-cyan-200 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold text-white text-xs">
+                  <Laptop className="w-4 h-4 text-cyan-400" />
+                  <span>Como Abrir Diretamente pelo Android Studio:</span>
                 </div>
-                <pre className="rounded-lg bg-black border border-neutral-800 p-3 font-mono text-emerald-300 overflow-x-auto text-[11px] leading-relaxed max-h-[30vh]">
-                  {gitignoreCode}
-                </pre>
-              </div>
-
-              {/* Dica de Clonagem */}
-              <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-800/60 text-cyan-200 text-xs flex items-start gap-3">
-                <Github className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <strong className="block font-bold">Ao clonar em um novo computador com Android Studio:</strong>
-                  <p className="text-cyan-300/80 leading-relaxed">
-                    Basta rodar <code className="bg-black/60 px-1 py-0.5 rounded text-white">git clone &lt;link&gt;</code>, entrar na pasta e executar <code className="bg-black/60 px-1 py-0.5 rounded text-white">npm install</code>. Em seguida, siga para a aba "2. Comandos do Capacitor".
-                  </p>
-                </div>
+                <p className="text-neutral-300 leading-relaxed text-[11px]">
+                  A pasta <code className="bg-black/60 px-1.5 py-0.5 rounded text-white font-mono font-bold">android/</code> já vem 100% estruturada com <code className="text-cyan-300">build.gradle</code>, <code className="text-cyan-300">settings.gradle</code>, <code className="text-cyan-300">gradlew</code> e o manifesto configurado para Android TV e Celular.
+                </p>
+                <ol className="list-decimal pl-5 space-y-1 text-[11px] text-neutral-300">
+                  <li>Abra o <strong>Android Studio</strong> instalado no seu PC.</li>
+                  <li>Clique no menu superior em <strong>File &gt; Open</strong> (ou <em>Open Project</em> na tela inicial).</li>
+                  <li>Navegue até a pasta do projeto descompactada e selecione a subpasta <strong>android</strong>.</li>
+                  <li>Aguarde o Android Studio sincronizar o Gradle automaticamente (<em>Gradle Sync</em>).</li>
+                </ol>
               </div>
             </div>
           )}
@@ -692,15 +691,15 @@ public class MainActivity extends BridgeActivity {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-                    Passo 2: Instalação e Inicialização do Capacitor
+                    Passo 2: Comandos Rápidos do Capacitor e Build
                   </h3>
                   <p className="text-xs text-neutral-400 mt-0.5">
-                    Abra o terminal na pasta do projeto e execute os comandos abaixo sequencialmente:
+                    Abra o terminal na pasta local do projeto e execute os comandos abaixo sequencialmente:
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard(cloneCommands, 'terminal')}
+                  onClick={() => copyToClipboard(localTerminalCommands, 'terminal')}
                   className="px-3.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-neutral-700"
                 >
                   {copiedSection === 'terminal' ? (
@@ -718,7 +717,7 @@ public class MainActivity extends BridgeActivity {
               </div>
 
               <div className="rounded-xl bg-black border border-neutral-800 p-4 font-mono text-cyan-300 overflow-x-auto text-[11px] leading-relaxed">
-                <pre>{cloneCommands}</pre>
+                <pre>{localTerminalCommands}</pre>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
@@ -1004,7 +1003,7 @@ public class MainActivity extends BridgeActivity {
         <div className="p-4 border-t border-neutral-800 bg-[#121212] flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Configuração pronta para GitHub, Android TV, Google TV e Smartphones Android.</span>
+            <span>Configuração 100% pronta para pasta local no PC, Android TV, Google TV e Celular.</span>
           </div>
 
           <button

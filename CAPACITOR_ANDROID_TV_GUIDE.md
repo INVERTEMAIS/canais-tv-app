@@ -174,36 +174,79 @@ O componente `IptvPlayer.tsx` utiliza a biblioteca de alta performance `Hls.js` 
 
 ---
 
-## 9. Passo a Passo de Compilação do APK no Android Studio
+## 9. Passo a Passo de Criação e Compilação com ZIP / Pasta Local no PC (Sem GitHub)
 
-1. **Gere o build dos arquivos estáticos:**
-   ```bash
-   npm run build
-   ```
-2. **Sincronize com a pasta nativa Android:**
-   ```bash
-   npx cap sync android
-   ```
-3. **Abra o projeto no Android Studio:**
-   ```bash
-   npx cap open android
-   ```
-4. **No Android Studio:**
-   - Aguarde a sincronização do Gradle (*Gradle Sync Finished*).
-   - No menu superior, vá em **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
-   - Ao concluir, clique em **locate** para pegar o arquivo `app-debug.apk`.
+Não é necessário usar GitHub ou Git! Você pode baixar o arquivo ZIP completo do projeto diretamente no Google AI Studio e trabalhar 100% na sua máquina local:
+
+### Passo 1: Baixar e Descompactar o Projeto
+1. No Google AI Studio, clique na opção de **Download / Exportar ZIP** do projeto.
+2. Descompacte o arquivo `.zip` em uma pasta de sua escolha no seu computador:
+   - **Exemplo no Windows:** `C:\projetos\netplay`
+   - **Exemplo no Mac/Linux:** `~/projetos/netplay`
+
+### Passo 2: Instalar Dependências e Gerar o Build
+Abra o terminal (Prompt de Comando ou PowerShell no Windows, Terminal no Mac/Linux) dentro da pasta descompactada:
+```bash
+# 1. Instalar as dependências do projeto (Capacitor e React já inclusos no package.json)
+npm install
+
+# 2. Gerar o build da aplicação Web de alta velocidade
+npm run build
+
+# 3. Sincronizar os arquivos compilados com a pasta nativa Android
+npx cap sync android
+```
+
+### Passo 3: Abrir no Android Studio
+Você tem duas opções fáceis para abrir o projeto:
+
+- **Opção A (Pelo Terminal):**
+  ```bash
+  npx cap open android
+  # ou: npm run cap:open
+  ```
+
+- **Opção B (Direto pelo Android Studio):**
+  1. Abra o **Android Studio**.
+  2. Clique em **File > Open** (ou *Open Project*).
+  3. Navegue até a pasta do projeto descompactada e selecione a subpasta **`android`**.
+  4. O Android Studio reconhecerá o projeto Gradle imediatamente.
+
+### Passo 4: Estrutura Nativa Android Já Pronta
+A pasta `android/` já está 100% configurada:
+- `build.gradle`, `settings.gradle` e `variables.gradle` prontos para compilação.
+- `app/build.gradle` configurado com `applicationId: com.netplay.app` e SDK 34.
+- `AndroidManifest.xml` configurado para **Android TV (Leanback Launcher)** e **Smartphones (Touchscreen opcional)**.
+- `MainActivity.java` configurado com repasse de teclas do controle remoto **D-PAD**, aceleração de hardware e mixed content para streaming contínuo.
+
+### Passo 5: Gerar o APK Instalável
+1. No Android Studio, aguarde o processo **Gradle Sync Finished** (barra inferior).
+2. No menu superior, vá em:
+   **Build > Build Bundle(s) / APK(s) > Build APK(s)**
+3. Aguarde alguns segundos até a notificação no canto inferior direito informando:
+   *`APK(s) generated successfully for module 'netplay.app'`*.
+4. Clique no link azul **`locate`** na notificação (ou abra a pasta `android/app/build/outputs/apk/debug/`).
+5. O arquivo **`app-debug.apk`** estará pronto para ser instalado!
 
 ---
 
 ## 10. Instalação e Testes na Smart TV e Celular
 
-### Na Smart TV (Android TV, TV Box, Fire TV):
-1. Copie o arquivo `app-debug.apk` para um pendrive ou envie via aplicativo **Send Files to TV**.
-2. Abra um gerenciador de arquivos na TV (ex: *X-plore* ou *File Commander*) e instale o APK.
-3. O ícone oficial do **NETPLAY** aparecerá na fileira principal de aplicativos com o banner 16:9 de cinema.
-4. Navegue 100% pelas setas do controle remoto!
+### Na Smart TV (Android TV, Google TV, TV Box, Fire TV):
+1. **Método Pen Drive:**
+   - Copie o arquivo `app-debug.apk` para um pen drive.
+   - Conecte o pen drive na porta USB da sua TV ou TV Box.
+   - Abra um gerenciador de arquivos (ex: *File Commander*, *X-plore* ou *AnExplorer*) e selecione o APK para instalar.
+2. **Método Sem Fio (Send Files to TV):**
+   - Instale o app gratuito **Send Files to TV** na TV e no celular/PC.
+   - Transfira o APK pela rede Wi-Fi e instale diretamente na TV.
+3. **Método App Downloader (Fire TV):**
+   - No Fire TV, use o app *Downloader* para baixar o APK hospedado em um link direto (Google Drive, Dropbox, Mediafire).
+4. **Experiência na TV:**
+   - O aplicativo aparecerá na grade inicial da TV com o banner 16:9 oficial do **NETPLAY**.
+   - Toda a navegação funciona 100% pelas setas (D-PAD) do controle remoto!
 
-### No Celular Android:
-1. Envie o APK para o smartphone (via WhatsApp, Telegram ou Google Drive).
-2. Toque no arquivo e confirme a instalação (ativando fontes desconhecidas se solicitado).
-3. O app se adaptará com rolagem vertical, toque tátil e modo paisagem automático.
+### No Celular Android (Smartphone / Tablet):
+1. Transfira o arquivo `app-debug.apk` para o celular (via WhatsApp, Telegram, cabo USB ou Google Drive).
+2. Toque no arquivo APK e confirme a instalação (habilite "Instalar de fontes desconhecidas" se o Android solicitar).
+3. O aplicativo se ajusta automaticamente com rolagem vertical suave, comandos táteis e rotação de tela para modo cinema widescreen.
