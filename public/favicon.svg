@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF1E28"/>
+      <stop offset="100%" stop-color="#B80710"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- Background: Deep Black Rounded Square -->
+  <rect width="512" height="512" rx="128" fill="#111111"/>
+  <!-- Subtle border for high contrast on white/dark screens -->
+  <rect x="8" y="8" width="496" height="496" rx="120" fill="none" stroke="#E50914" stroke-width="12" opacity="0.8"/>
+  <!-- Central Icon: Vibrant Red Play Emblem -->
+  <circle cx="256" cy="256" r="160" fill="url(#redGrad)" filter="url(#shadow)"/>
+  <!-- White Play Arrow -->
+  <path d="M220 176 L340 256 L220 336 Z" fill="#FFFFFF"/>
+</svg>

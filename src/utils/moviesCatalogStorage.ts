@@ -7,7 +7,7 @@ export const CATALOG_SETTINGS_KEY = 'netplay_catalog_settings_v1';
 
 // Configurações padrão de catálogo e domínio base
 export const DEFAULT_CATALOG_SETTINGS: CatalogSettings = {
-  redecanaisDomain: 'https://redecanais.la',
+  redecanaisDomain: 'https://redecanais.af',
   autoRenewOn403: true,
 };
 
@@ -97,10 +97,12 @@ export function evaluateTokenHealth(movie: MovieItem): {
   const diffMs = expiresAt - now;
 
   if (diffMs <= 0) {
+    const expiredDate = new Date(expiresAt);
+    const expiredTimeStr = `${expiredDate.getHours().toString().padStart(2, '0')}:${expiredDate.getMinutes().toString().padStart(2, '0')}`;
     return {
       status: 'expired',
-      message: 'Token Expirado',
-      expiresInText: 'Expirado',
+      message: `Token Expirado às ${expiredTimeStr}`,
+      expiresInText: `Expirou às ${expiredTimeStr}`,
       expiresAt,
     };
   }
@@ -217,29 +219,88 @@ export function bulkUpdateMoviesDomain(
 }
 
 /**
- * Utilitário anti-expiração de tokens:
- * Se um link contiver token temporário com timestamp (ex: nu3zAQc9HC3GbwJq=1789858783-...),
- * detectamos e preparamos a URL para permitir renovação ou manter o vídeo tocando.
+ * Desembrulha URLs de proxies (como null-null.shop/tos-alisg-avt-0068/proxy?container=videos&...&url=https://...)
+ * Retorna o link direto original do vídeo MP4, se estava embrulhado, token e expiração
  */
-export function prepareStreamUrl(rawUrl: string, freshToken?: string): string {
+export function unwrapStreamUrl(rawUrl: string): {
+  url: string;
+  isWrapped: boolean;
+  innerUrl?: string;
+  token?: string;
+  expiresAt?: number;
+  clientIp?: string;
+} {
+  if (!rawUrl) return { url: '', isWrapped: false };
+  let trimmed = rawUrl.trim();
+  if (trimmed.startsWith('//')) {
+    trimmed = `https:${trimmed}`;
+  }
+
+  const urlParamIndex = trimmed.indexOf('url=http');
+  const isWrapped = urlParamIndex !== -1 && (trimmed.includes('null-null.shop') || trimmed.includes('/proxy?'));
+
+  let effectiveUrl = trimmed;
+  let innerUrl: string | undefined;
+
+  if (isWrapped) {
+    innerUrl = trimmed.slice(urlParamIndex + 4);
+    effectiveUrl = innerUrl;
+  }
+
+  const tokenMatch =
+    trimmed.match(/nu3zAQc9HC3GbwJq=([a-zA-Z0-9%\-_=]+)/) ||
+    effectiveUrl.match(/nu3zAQc9HC3GbwJq=([a-zA-Z0-9%\-_=]+)/);
+  const token = tokenMatch ? tokenMatch[1] : undefined;
+
+  const ipMatch = trimmed.match(/[?&]ip=([^&]+)/) || effectiveUrl.match(/[?&]ip=([^&]+)/);
+  const clientIp = ipMatch ? decodeURIComponent(ipMatch[1]) : undefined;
+
+  const expiresAt = extractTokenExpiration(effectiveUrl) || extractTokenExpiration(trimmed) || undefined;
+
+  return {
+    url: effectiveUrl,
+    isWrapped,
+    innerUrl,
+    token,
+    expiresAt,
+    clientIp,
+  };
+}
+
+/**
+ * Utilitário anti-expiração de tokens:
+ * Prepara e normaliza a URL do vídeo, aplicando novos links completos ou novos tokens
+ */
+export function prepareStreamUrl(rawUrl: string, freshTokenOrNewUrl?: string): string {
   if (!rawUrl) return '';
   let url = rawUrl.trim();
 
-  // Se o usuário passou um novo token para reanimar o link
-  if (freshToken && freshToken.trim()) {
+  // Se o usuário passou uma URL inteira nova (ex: colou link direto ou link atualizado)
+  if (
+    freshTokenOrNewUrl &&
+    (freshTokenOrNewUrl.startsWith('http://') ||
+      freshTokenOrNewUrl.startsWith('https://') ||
+      freshTokenOrNewUrl.startsWith('//'))
+  ) {
+    return freshTokenOrNewUrl.trim();
+  }
+
+  // Se o usuário passou um novo hash/token avulso (ex: nu3zAQc9HC3GbwJq=... ou 179...-...)
+  if (freshTokenOrNewUrl && freshTokenOrNewUrl.trim()) {
     try {
+      const cleanToken = freshTokenOrNewUrl.replace(/^nu3zAQc9HC3GbwJq=/, '').trim();
       const parsed = new URL(url);
       const tokenKeys = ['nu3zAQc9HC3GbwJq', 'token', 'auth', 'expires', 'sig', 'hash'];
       let replaced = false;
       for (const key of tokenKeys) {
         if (parsed.searchParams.has(key)) {
-          parsed.searchParams.set(key, freshToken.trim());
+          parsed.searchParams.set(key, cleanToken);
           replaced = true;
           break;
         }
       }
       if (!replaced) {
-        parsed.searchParams.set('token', freshToken.trim());
+        parsed.searchParams.set('nu3zAQc9HC3GbwJq', cleanToken);
       }
       return parsed.toString();
     } catch {
@@ -252,79 +313,60 @@ export function prepareStreamUrl(rawUrl: string, freshToken?: string): string {
 
 export const INITIAL_MOVIES_CATALOG: MovieItem[] = [
   {
-    id: 'movie-redecanais-sample',
-    title: 'Missão Resgate (Exemplo Auto-Renovação)',
-    category: 'Ação',
-    year: 2024,
-    rating: '16',
-    duration: '1h 58m',
-    synopsis:
-      'Um soldado de operações clandestinas embarca em uma perigosa missão através da Europa Oriental para resgatar civis após um atentado.',
-    streamUrl:
-      'https://xn--l---------------------------_________________________-2w85c.null-null.shop/tos-alisg-avt-0068/proxy?container=videos&refresh=31536000&url=https://neosoro.gq/V/RCFServer4/ondemand/MSOCGNHA.mp4?sv=24&cc=y&secure_uri=true&nu3zAQc9HC3GbwJq=1789858783-1aVawtjNUaVr1Fmgr5piXHcGJHExiHUZzfGFwHV9ypk%3D',
-    sourcePageUrl: 'https://redecanais.la/missao-resgate-dublado',
-    sourceProvider: 'redecanais',
-    tokenParamKey: 'nu3zAQc9HC3GbwJq',
-    tokenExpiresAt: 1789858783000,
-    backdropColor: 'from-black via-[#1c0606] to-[#0a0a0a]',
-    accentColor: '#E50914',
-    createdAt: Date.now(),
-  },
-  {
     id: 'movie-big-buck-bunny',
     title: 'Big Buck Bunny (Full HD 4K)',
     category: 'Animação',
-    year: 2023,
+    year: 2024,
     rating: 'Livre',
     duration: '9m 56s',
     synopsis:
       'Em uma floresta encantada, um adorável coelho gigante é provocado por esquilos e criaturas travessas até decidir ensinar-lhes uma grande lição.',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    streamUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4',
     backdropColor: 'from-black via-[#140000] to-[#0d0d0d]',
     accentColor: '#E50914',
+    createdAt: Date.now(),
+  },
+  {
+    id: 'movie-oceans-hd',
+    title: 'Oceans (Vida Marinha e Mistérios do Abismo)',
+    category: 'Documentário',
+    year: 2023,
+    rating: 'Livre',
+    duration: '1h 24m',
+    synopsis:
+      'Uma expedição cinematográfica espetacular pelos oceanos do mundo, revelando a beleza, força e fragilidade dos ecossistemas aquáticos.',
+    streamUrl: 'https://vjs.zencdn.net/v/oceans.mp4',
+    backdropColor: 'from-[#031326] via-black to-[#06101c]',
+    accentColor: '#E50914',
     createdAt: Date.now() - 1000,
-  },
-  {
-    id: 'movie-tears-of-steel',
-    title: 'Tears of Steel (Guerra Tecnológica)',
-    category: 'Ficção & Fantasia',
-    year: 2022,
-    rating: '14',
-    duration: '12m 14s',
-    synopsis:
-      'Em um futuro distópico dominado por robôs e inteligência artificial, um grupo de cientistas e combatentes em Amsterdã constrói uma última esperança.',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    backdropColor: 'from-[#111111] via-black to-[#180505]',
-    accentColor: '#E50914',
-    createdAt: Date.now() - 2000,
-  },
-  {
-    id: 'movie-elephants-dream',
-    title: 'Elephants Dream (Mundo das Máquinas)',
-    category: 'Ficção & Fantasia',
-    year: 2021,
-    rating: '12',
-    duration: '10m 54s',
-    synopsis:
-      'Dois viajantes exploram os segredos de uma máquina colossal que parece ter consciência própria e desafia as leis da física.',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    backdropColor: 'from-black via-[#1c0606] to-[#0a0a0a]',
-    accentColor: '#E50914',
-    createdAt: Date.now() - 3000,
   },
   {
     id: 'movie-sintel',
     title: 'Sintel (A Busca do Dragão)',
     category: 'Animação',
-    year: 2020,
+    year: 2023,
     rating: '10',
     duration: '15m 20s',
     synopsis:
       'Uma jovem guerreira solitária viaja por montanhas nevadas e desertos implacáveis em busca de seu pequeno dragão de estimação que foi capturado.',
-    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    streamUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
     backdropColor: 'from-black via-[#160404] to-black',
     accentColor: '#E50914',
-    createdAt: Date.now() - 4000,
+    createdAt: Date.now() - 2000,
+  },
+  {
+    id: 'movie-jellyfish-depths',
+    title: 'Deep Ocean (Jellyfish & As Profundezas)',
+    category: 'Documentário',
+    year: 2023,
+    rating: 'Livre',
+    duration: '45m 10s',
+    synopsis:
+      'Imagens raras e hipnotizantes em alta definição das criaturas bioluminescentes das profundezas abissais.',
+    streamUrl: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_5MB.mp4',
+    backdropColor: 'from-black via-[#1c0606] to-[#0a0a0a]',
+    accentColor: '#E50914',
+    createdAt: Date.now() - 3000,
   },
 ];
 
@@ -334,14 +376,67 @@ export function loadMoviesCatalog(): MovieItem[] {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => ({
-          ...item,
-          tokenExpiresAt: item.tokenExpiresAt || extractTokenExpiration(item.streamUrl),
-          backdropColor: item.backdropColor?.includes('emerald') || item.backdropColor?.includes('purple') || item.backdropColor?.includes('cyan') || item.backdropColor?.includes('blue') || item.backdropColor?.includes('amber')
-            ? 'from-black via-[#160404] to-black'
-            : item.backdropColor || 'from-black via-[#160404] to-black',
-          accentColor: '#E50914',
-        }));
+        const seenIds = new Set<string>();
+        const mappedList: MovieItem[] = [];
+
+        for (const item of parsed) {
+          if (!item) continue;
+          let streamUrl = item.streamUrl || '';
+          let itemId = item.id || `movie_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+          // Se for o antigo item de amostra do Gladiador, converte ou remove duplicata
+          if (itemId === 'movie-redecanais-sample') {
+            if (seenIds.has('movie-big-buck-bunny')) {
+              continue; // Evita chave duplicada
+            }
+            itemId = 'movie-big-buck-bunny';
+            streamUrl = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4';
+          }
+
+          // Migração automática de links antigos expirados ou inacessíveis
+          if (
+            streamUrl.includes('commondatastorage.googleapis.com/gtv-videos-bucket') ||
+            (streamUrl.includes('null-null.shop') && streamUrl.includes('1789858783'))
+          ) {
+            if (streamUrl.includes('BigBuckBunny') || item.title?.includes('Gladiador')) {
+              streamUrl = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4';
+            } else if (streamUrl.includes('TearsOfSteel')) {
+              streamUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+            } else if (streamUrl.includes('Sintel')) {
+              streamUrl = 'https://media.w3.org/2010/05/sintel/trailer.mp4';
+            } else if (streamUrl.includes('ElephantsDream')) {
+              streamUrl = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_5MB.mp4';
+            } else {
+              streamUrl = 'https://vjs.zencdn.net/v/oceans.mp4';
+            }
+          }
+
+          // Garante unicidade absoluta de IDs no catálogo
+          if (seenIds.has(itemId)) {
+            itemId = `${itemId}_${Math.random().toString(36).slice(2, 6)}`;
+          }
+          seenIds.add(itemId);
+
+          mappedList.push({
+            ...item,
+            id: itemId,
+            streamUrl,
+            tokenExpiresAt: item.tokenExpiresAt || extractTokenExpiration(streamUrl),
+            backdropColor:
+              item.backdropColor?.includes('emerald') ||
+              item.backdropColor?.includes('purple') ||
+              item.backdropColor?.includes('cyan') ||
+              item.backdropColor?.includes('blue') ||
+              item.backdropColor?.includes('amber')
+                ? 'from-black via-[#160404] to-black'
+                : item.backdropColor || 'from-black via-[#160404] to-black',
+            accentColor: '#E50914',
+          });
+        }
+
+        if (mappedList.length > 0) {
+          return mappedList;
+        }
       }
     }
   } catch (err) {

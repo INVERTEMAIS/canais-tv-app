@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { X, Plus, AlertCircle, Link as LinkIcon, ShieldAlert, Globe, Zap } from 'lucide-react';
+import { X, Plus, AlertCircle, Link as LinkIcon, ShieldAlert, Globe, Zap, Search, Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { MovieCategory, MovieItem } from '../types/movies';
-import { NETFLIX_PALETTES } from '../utils/moviesCatalogStorage';
+import { NETFLIX_PALETTES, unwrapStreamUrl, extractTokenExpiration } from '../utils/moviesCatalogStorage';
 import { useModalArrowNavigation } from '../hooks/useModalArrowNavigation';
 
 const CATEGORIES: MovieCategory[] = [
@@ -17,7 +17,8 @@ const CATEGORIES: MovieCategory[] = [
 interface AddMovieModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddMovie: (movie: MovieItem) => void;
+  onAddMovie?: (movie: MovieItem) => void;
+  onSave?: (movie: MovieItem) => void;
   editingMovie?: MovieItem | null;
   onUpdateMovie?: (movie: MovieItem) => void;
 }
@@ -26,6 +27,7 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
   isOpen,
   onClose,
   onAddMovie,
+  onSave,
   editingMovie,
   onUpdateMovie,
 }) => {
@@ -36,7 +38,10 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
   const [duration, setDuration] = useState('1h 50m');
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [synopsis, setSynopsis] = useState('');
+  const [posterUrl, setPosterUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isFetchingInfo, setIsFetchingInfo] = useState<boolean>(false);
+  const [fetchSuccessMsg, setFetchSuccessMsg] = useState<string | null>(null);
 
   // Sincroniza campos quando o filme para edição mudar ou o modal abrir
   React.useEffect(() => {
@@ -48,6 +53,7 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
       setDuration(editingMovie.duration || '1h 50m');
       setYear(editingMovie.year ? editingMovie.year.toString() : new Date().getFullYear().toString());
       setSynopsis(editingMovie.synopsis || '');
+      setPosterUrl(editingMovie.posterUrl || '');
     } else {
       setTitle('');
       setStreamUrl('');
@@ -56,8 +62,10 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
       setDuration('1h 50m');
       setYear(new Date().getFullYear().toString());
       setSynopsis('');
+      setPosterUrl('');
     }
     setError(null);
+    setFetchSuccessMsg(null);
   }, [editingMovie, isOpen]);
 
   const modalContainerRef = useRef<HTMLDivElement | null>(null);
@@ -69,6 +77,53 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
     containerRef: modalContainerRef,
     defaultFocusIndex: 0,
   });
+
+  // Função para puxar informações automaticamente a partir de um link ou nome
+  const handleAutoFetchMetadata = async (customUrl?: string) => {
+    const urlToFetch = (customUrl || streamUrl || sourcePageUrl).trim();
+    if (!urlToFetch && !title.trim()) {
+      setError('Cole o link do vídeo/filme ou digite o nome para buscar as informações.');
+      return;
+    }
+
+    setIsFetchingInfo(true);
+    setError(null);
+    setFetchSuccessMsg(null);
+
+    try {
+      const res = await fetch('/api/fetch-movie-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: urlToFetch || undefined,
+          query: title.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Não foi possível encontrar dados para este link.');
+      }
+
+      const meta = data.metadata;
+      if (meta.title && (!title || !editingMovie)) setTitle(meta.title);
+      if (meta.synopsis) setSynopsis(meta.synopsis);
+      if (meta.category) setCategory(meta.category as MovieCategory);
+      if (meta.year) setYear(meta.year.toString());
+      if (meta.duration) setDuration(meta.duration);
+      if (meta.streamUrl && !streamUrl) setStreamUrl(meta.streamUrl);
+      if (meta.sourcePageUrl && !sourcePageUrl) setSourcePageUrl(meta.sourcePageUrl);
+      if (meta.posterUrl) setPosterUrl(meta.posterUrl);
+
+      setFetchSuccessMsg(`Informações de "${meta.title || 'Filme'}" identificadas com sucesso!`);
+      setTimeout(() => setFetchSuccessMsg(null), 5000);
+    } catch (err: any) {
+      console.warn('Falha na busca de metadados:', err);
+      setError(err.message || 'Falha ao buscar dados automáticos do filme.');
+    } finally {
+      setIsFetchingInfo(false);
+    }
+  };
 
   // Detector de Token de Expiração para links HTTP/MP4
   const detectedToken = React.useMemo(() => {
@@ -110,7 +165,7 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
 
     const randomPalette = NETFLIX_PALETTES[Math.floor(Math.random() * NETFLIX_PALETTES.length)];
 
-    if (editingMovie && onUpdateMovie) {
+    if (editingMovie) {
       const updated: MovieItem = {
         ...editingMovie,
         title: title.trim(),
@@ -120,8 +175,15 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
         duration: duration.trim() || '1h 50m',
         year: parseInt(year, 10) || new Date().getFullYear(),
         synopsis: synopsis.trim() || 'Filme cadastrado no catálogo NetPlay.',
+        posterUrl: posterUrl.trim() || undefined,
       };
-      onUpdateMovie(updated);
+      if (onUpdateMovie) {
+        onUpdateMovie(updated);
+      } else if (onSave) {
+        onSave(updated);
+      } else if (onAddMovie) {
+        onAddMovie(updated);
+      }
       onClose();
       return;
     }
@@ -135,13 +197,18 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
       duration: duration.trim() || '1h 50m',
       year: parseInt(year, 10) || new Date().getFullYear(),
       synopsis: synopsis.trim() || 'Filme cadastrado no catálogo NetPlay.',
+      posterUrl: posterUrl.trim() || undefined,
       tokenParamKey: detectedToken?.key,
       backdropColor: randomPalette.bg,
       accentColor: randomPalette.accent,
       createdAt: Date.now(),
     };
 
-    onAddMovie(newMovie);
+    if (onAddMovie) {
+      onAddMovie(newMovie);
+    } else if (onSave) {
+      onSave(newMovie);
+    }
     onClose();
   };
 
@@ -168,17 +235,62 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
         {/* Form Body em Fundo Branco e Controles Claros */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
           {error && (
-            <div className="p-3 bg-red-50 border-2 border-red-500 text-red-700 rounded-xl flex items-center gap-2 font-bold">
+            <div className="p-3 bg-red-50 border-2 border-red-500 text-red-700 rounded-xl flex items-center gap-2 font-bold animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
               <span>{error}</span>
             </div>
           )}
 
+          {fetchSuccessMsg && (
+            <div className="p-3 bg-emerald-50 border-2 border-emerald-500 text-emerald-800 rounded-xl flex items-center gap-2 font-bold animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{fetchSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* Painel Inteligente de Auto-Preenchimento por Link */}
+          <div className="p-3.5 bg-neutral-100 rounded-xl border border-neutral-300 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-neutral-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#E50914]" />
+                Auto-Preenchimento por Link ou Título
+              </span>
+              <span className="text-[10px] text-neutral-500 font-semibold">
+                Detecção Automática
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-600 leading-relaxed">
+              Cole o link do vídeo (MP4), página de download ou digite o nome do filme para preencher automaticamente título, sinopse, ano e categoria.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={isFetchingInfo}
+                onClick={() => handleAutoFetchMetadata()}
+                className="w-full py-2 px-3 rounded-lg bg-[#E50914] hover:bg-[#b80710] disabled:bg-neutral-400 text-white font-black text-xs flex items-center justify-center gap-2 shadow transition active:scale-95 cursor-pointer"
+              >
+                {isFetchingInfo ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Identificando Filme...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Puxar Informações do Filme</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* Nome do Filme */}
           <div>
-            <label className="block text-neutral-900 font-extrabold mb-1.5 uppercase tracking-wider text-[11px]">
-              Nome do Filme *
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-neutral-900 font-extrabold uppercase tracking-wider text-[11px]">
+                Nome do Filme *
+              </label>
+            </div>
             <input
               type="text"
               value={title}
@@ -194,14 +306,31 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
 
           {/* Link MP4 ou M3U8 do Vídeo */}
           <div>
-            <label className="block text-neutral-900 font-extrabold mb-1.5 uppercase tracking-wider text-[11px]">
-              Link de Transmissão (MP4 ou HLS .M3U8) *
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-neutral-900 font-extrabold uppercase tracking-wider text-[11px]">
+                Link de Transmissão (MP4 ou HLS .M3U8) *
+              </label>
+              {(streamUrl || sourcePageUrl) && !title && (
+                <button
+                  type="button"
+                  onClick={() => handleAutoFetchMetadata()}
+                  className="text-[10px] font-bold text-[#E50914] hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Puxar dados deste link
+                </button>
+              )}
+            </div>
             <div className="relative">
               <input
                 type="text"
                 value={streamUrl}
                 onChange={(e) => setStreamUrl(e.target.value)}
+                onBlur={() => {
+                  if (streamUrl && !title) {
+                    handleAutoFetchMetadata(streamUrl);
+                  }
+                }}
                 placeholder="https://.../video.mp4 ou https://.../playlist.m3u8"
                 className="w-full bg-neutral-50 border-2 border-neutral-300 rounded-xl pl-9 pr-3.5 py-2.5 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:bg-white focus:border-[#E50914] font-mono text-[11px]"
                 required
@@ -209,15 +338,56 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
               <LinkIcon className="w-4 h-4 text-neutral-500 absolute left-3 top-3" />
             </div>
 
-            {/* Aviso Inteligente Anti-Expiração de Token para links HTTP */}
-            {detectedToken && (
-              <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-[11px] flex items-start gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-[#E50914] mt-0.5" />
-                <div>
-                  <span className="font-extrabold text-[#E50914]">Token de Segurança Detectado:</span> O link contém parâmetros de autorização ({detectedToken.key}). Se o link expirar no futuro, basta abrir aqui e trocar a URL para revalidar!
+            {/* Detector de Proxy e Desembrulhar Link Direto */}
+            {unwrapStreamUrl(streamUrl).isWrapped && (
+              <div className="mt-2 p-2.5 rounded-xl bg-blue-50 border border-blue-300 text-blue-950 text-[11px] flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Zap className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Link de Proxy detectado ({unwrapStreamUrl(streamUrl).url.split('/')[2]})</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unwrapped = unwrapStreamUrl(streamUrl);
+                    if (unwrapped.url) setStreamUrl(unwrapped.url);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] tracking-wide transition cursor-pointer"
+                >
+                  ⚡ Desembrulhar MP4 Direto
+                </button>
               </div>
             )}
+
+            {/* Aviso Inteligente de Expiração de Token */}
+            {(() => {
+              const exp = extractTokenExpiration(streamUrl);
+              if (exp) {
+                const diff = exp - Date.now();
+                if (diff <= 0) {
+                  const d = new Date(exp);
+                  const time = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                  return (
+                    <div className="mt-2 p-2.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-[11px] flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                      <div>
+                        <span className="font-extrabold text-red-700">Token Expirado às {time}:</span> Este link já expirou e pode ser rejeitado pelo servidor. Recomendado colar um link novo ou cadastrar a Página de Origem para auto-renovação.
+                      </div>
+                    </div>
+                  );
+                }
+              }
+              if (detectedToken) {
+                return (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-[11px] flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-[#E50914] mt-0.5" />
+                    <div>
+                      <span className="font-extrabold text-[#E50914]">Token de Transmissão Detectado:</span> O link contém parâmetros de autorização ({detectedToken.key}).
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Página de Origem do Filme (Auto-Renovação Anti-Expiração) */}

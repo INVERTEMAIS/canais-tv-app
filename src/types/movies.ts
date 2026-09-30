@@ -10,6 +10,7 @@ export interface MovieItem {
   year?: number;
   rating?: string;
   synopsis?: string;
+  posterUrl?: string; // Capa / Pôster do filme se disponível
   backdropColor?: string; // Paleta de gradiente sofisticada estilo Netflix
   accentColor?: string;
   createdAt: number;

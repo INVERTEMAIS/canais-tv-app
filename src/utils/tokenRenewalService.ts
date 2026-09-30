@@ -9,6 +9,8 @@ export interface TokenRenewalResult {
   detectedToken?: string;
   expiresAt?: number | null;
   finalPageUrl?: string;
+  methodUsed?: string;
+  macroPattern?: string;
 }
 
 export interface DomainCheckResult {
@@ -83,6 +85,8 @@ export async function renewMovieToken(
         detectedToken: data.detectedToken,
         expiresAt,
         finalPageUrl: data.finalPageUrl,
+        methodUsed: data.methodUsed,
+        macroPattern: data.macroPattern,
       };
     }
 

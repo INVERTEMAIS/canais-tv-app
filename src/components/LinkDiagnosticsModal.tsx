@@ -31,7 +31,8 @@ interface LinkDiagnosticsModalProps {
   isOpen: boolean;
   onClose: () => void;
   movies: MovieItem[];
-  onUpdateMovies: (updatedMovies: MovieItem[]) => void;
+  onUpdateMovies?: (updatedMovies: MovieItem[]) => void;
+  onMoviesUpdated?: (updatedMovies: MovieItem[]) => void;
   onPlayMovie?: (movie: MovieItem) => void;
 }
 
@@ -40,8 +41,17 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
   onClose,
   movies,
   onUpdateMovies,
+  onMoviesUpdated,
   onPlayMovie,
 }) => {
+  const notifyMoviesUpdated = (updatedList: MovieItem[]) => {
+    if (typeof onUpdateMovies === 'function') {
+      onUpdateMovies(updatedList);
+    }
+    if (typeof onMoviesUpdated === 'function') {
+      onMoviesUpdated(updatedList);
+    }
+  };
   const [settings, setSettings] = useState<CatalogSettings>(() => loadCatalogSettings());
   const [domainInput, setDomainInput] = useState<string>(() => settings.redecanaisDomain);
   const [isTestingDomain, setIsTestingDomain] = useState<boolean>(false);
@@ -55,7 +65,7 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
   // Troca em massa de domínio
   const [showBulkSwap, setShowBulkSwap] = useState<boolean>(false);
   const [oldDomainInput, setOldDomainInput] = useState<string>('redecanais.la');
-  const [newDomainInput, setNewDomainInput] = useState<string>('redecanais.la');
+  const [newDomainInput, setNewDomainInput] = useState<string>('redecanais.af');
   const [bulkSwapMessage, setBulkSwapMessage] = useState<string | null>(null);
 
   // Filtros de listagem
@@ -182,7 +192,7 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
   const handleExecuteBulkSwap = () => {
     if (!oldDomainInput.trim() || !newDomainInput.trim()) return;
     const { updatedMovies, count } = bulkUpdateMoviesDomain(movies, oldDomainInput, newDomainInput);
-    onUpdateMovies(updatedMovies);
+    notifyMoviesUpdated(updatedMovies);
     saveMoviesCatalog(updatedMovies);
 
     // Atualiza também o domínio global ativo
@@ -217,12 +227,14 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
               }
             : m
         );
-        onUpdateMovies(updated);
+        notifyMoviesUpdated(updated);
         saveMoviesCatalog(updated);
         setFeedbackMessage({
           id: movie.id,
           success: true,
-          text: 'Token renovado com sucesso! Link pronto para tocar.',
+          text: res.methodUsed
+            ? `Link interceptado com sucesso via macro Automa (${res.methodUsed})! Token atualizado.`
+            : 'Token renovado com sucesso! Link pronto para tocar.',
         });
       } else {
         setFeedbackMessage({
@@ -268,7 +280,7 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
         }
       );
 
-      onUpdateMovies(updatedMovies);
+      notifyMoviesUpdated(updatedMovies);
       setFeedbackMessage({
         id: 'global',
         success: true,
@@ -292,7 +304,7 @@ export const LinkDiagnosticsModal: React.FC<LinkDiagnosticsModalProps> = ({
     const updated = movies.map((m) =>
       m.id === movie.id ? { ...m, sourcePageUrl: newSourceUrlInput.trim() || undefined } : m
     );
-    onUpdateMovies(updated);
+    notifyMoviesUpdated(updated);
     saveMoviesCatalog(updated);
     setEditingSourceId(null);
     setNewSourceUrlInput('');

@@ -116,44 +116,53 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs select-none animate-in fade-in duration-150"
     >
-      {/* Container Principal da Tela Escura Estilo Netflix */}
+      {/* Container Principal da Tela com Tema Branco, Vermelho e Preto */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl bg-[#141414] text-white rounded-2xl sm:rounded-3xl border-2 border-neutral-800 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(229,9,20,0.3)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-2xl bg-white text-neutral-900 rounded-2xl sm:rounded-3xl border-2 border-neutral-300 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
       >
-        {/* Efeito Luminoso de Fundo Netflix Vermelho */}
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#E50914]/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-[#E50914]/10 rounded-full blur-3xl pointer-events-none" />
-
         {/* Botão Fechar no Topo (X) */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-30 p-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-700/80 transition cursor-pointer active:scale-95 shadow-lg"
+          className="absolute top-4 right-4 z-30 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition cursor-pointer active:scale-95 shadow-lg"
           title="Fechar (Voltar / ESC)"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Cabeçalho Visual com Banner Sutil e Badges */}
-        <div className="relative px-6 sm:px-8 pt-8 pb-4 border-b border-neutral-800/80 bg-gradient-to-b from-neutral-900 via-[#161616] to-[#141414]">
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="bg-[#E50914] text-white text-[10px] sm:text-xs font-black px-3 py-1 rounded-md tracking-wider uppercase shadow-[0_0_10px_rgba(229,9,20,0.6)]">
+        {/* Cabeçalho Visual Cinemático Escuro com Badges */}
+        <div className="relative px-6 sm:px-8 pt-8 pb-5 border-b border-neutral-200 bg-gradient-to-b from-neutral-950 via-neutral-900 to-black text-white overflow-hidden">
+          {movie.posterUrl && (
+            <>
+              <img
+                src={movie.posterUrl}
+                alt={movie.title}
+                className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-xs"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-neutral-950" />
+            </>
+          )}
+          <div className="relative z-10 flex items-center gap-2 mb-3 flex-wrap">
+            <span className="bg-[#E50914] text-white text-[10px] sm:text-xs font-black px-3 py-1 rounded-md tracking-wider uppercase shadow-md shadow-red-600/40">
               {movie.category}
             </span>
             {movie.year && (
-              <span className="text-[11px] sm:text-xs text-neutral-300 font-bold bg-neutral-800/90 border border-neutral-700 px-2.5 py-0.5 rounded">
+              <span className="text-[11px] sm:text-xs text-neutral-200 font-bold bg-neutral-800/90 border border-neutral-700 px-2.5 py-0.5 rounded">
                 {movie.year}
               </span>
             )}
             {movie.duration && (
-              <span className="text-[11px] sm:text-xs text-neutral-400 font-medium">
+              <span className="text-[11px] sm:text-xs text-neutral-300 font-medium">
                 • {movie.duration}
               </span>
             )}
-            <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded ml-auto">
+            <span className="text-[10px] sm:text-[11px] text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-700 px-2 py-0.5 rounded ml-auto">
               FULL HD MP4
             </span>
           </div>
@@ -164,7 +173,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
 
           {/* Barra e Notificação de Progresso de Onde Parou */}
           {hasProgress && (
-            <div className="mt-4 p-3 rounded-xl bg-neutral-900/90 border border-neutral-700/80 flex items-center justify-between gap-3">
+            <div className="mt-4 p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <Clock className="w-4 h-4 text-[#E50914] shrink-0" />
                 <div>
@@ -177,7 +186,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               <button
                 type="button"
                 onClick={handleRestartFromBeginning}
-                className="text-[10px] font-bold text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 rounded-lg border border-neutral-600 transition flex items-center gap-1 cursor-pointer"
+                className="text-[10px] font-bold text-neutral-300 hover:text-white bg-neutral-800 hover:bg-neutral-700 px-2.5 py-1 rounded-lg border border-neutral-700 transition flex items-center gap-1 cursor-pointer"
               >
                 <RotateCcw className="w-3 h-3" />
                 Reiniciar
@@ -195,19 +204,19 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
           )}
         </div>
 
-        {/* Corpo: Sinopse Completa e Informações */}
-        <div className="px-6 sm:px-8 py-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-neutral-300 leading-relaxed">
+        {/* Corpo: Sinopse Completa e Informações em Fundo Branco */}
+        <div className="px-6 sm:px-8 py-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-neutral-700 leading-relaxed bg-white">
           <div>
-            <h4 className="text-[11px] font-black uppercase tracking-wider text-neutral-400 mb-1 font-['Outfit']">
+            <h4 className="text-[11px] font-black uppercase tracking-wider text-neutral-500 mb-1.5 font-['Outfit']">
               Sinopse do Filme
             </h4>
-            <p className="text-neutral-200 font-normal leading-relaxed whitespace-pre-line">
+            <p className="text-neutral-800 font-medium leading-relaxed whitespace-pre-line text-sm">
               {movie.synopsis ||
                 'Nenhuma sinopse cadastrada para este título. O filme pode ser reproduzido diretamente em alta definição nativa via streaming direto.'}
             </p>
           </div>
 
-          <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400">
+          <div className="pt-2 border-t border-neutral-200 flex items-center justify-between text-[11px] text-neutral-500">
             <span className="truncate max-w-xs sm:max-w-md font-mono text-neutral-500">
               Link: {movie.streamUrl.substring(0, 45)}...
             </span>
@@ -218,34 +227,34 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
         </div>
 
         {/* Rodapé com Botões de Ação Focáveis pelo Controle da TV */}
-        <div className="px-5 sm:px-8 py-3.5 sm:py-4 border-t border-neutral-800 bg-[#101010] flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
+        <div className="px-5 sm:px-8 py-3.5 sm:py-4 border-t border-neutral-200 bg-neutral-50 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-3">
           {/* Botão Assistir Principal */}
           <button
             type="button"
             onClick={() => onPlay(movie)}
             className={`w-full sm:w-auto px-6 py-2.5 sm:py-3 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all cursor-pointer active:scale-95 ${
               actionFocusIndex === 0
-                ? 'bg-[#E50914] text-white ring-4 ring-white scale-105 shadow-[0_0_25px_rgba(229,9,20,0.9)]'
-                : 'bg-[#E50914] hover:bg-[#b80710] text-white shadow-lg shadow-red-950/60'
+                ? 'bg-[#E50914] text-white ring-4 ring-red-400 scale-105 shadow-xl shadow-red-600/40'
+                : 'bg-[#E50914] hover:bg-[#b80710] text-white shadow-md shadow-red-600/30'
             }`}
           >
             <Play className="w-4 h-4 fill-current" />
             <span>{hasProgress ? 'Continuar Assistindo' : 'Assistir Agora'}</span>
           </button>
 
-          {/* Botões Secundários: Editar e Excluir Centralizados no Mobile */}
+          {/* Botões Secundários: Editar e Excluir */}
           <div className="flex items-center justify-center gap-2.5 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => onEdit(movie)}
               className={`flex-1 sm:flex-initial px-4 py-2.5 sm:py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 border ${
                 actionFocusIndex === 1
-                  ? 'bg-white text-neutral-950 border-white ring-4 ring-[#E50914] scale-105 shadow-xl'
-                  : 'bg-neutral-800/90 hover:bg-neutral-700 text-neutral-200 border-neutral-700'
+                  ? 'bg-black text-white border-black ring-4 ring-neutral-400 scale-105 shadow-md'
+                  : 'bg-white hover:bg-neutral-100 text-neutral-800 border-neutral-300'
               }`}
             >
               <Edit3 className="w-4 h-4 text-[#E50914]" />
-              <span>Editar</span>
+              <span>Editar Filme</span>
             </button>
 
             <button
@@ -253,12 +262,12 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               onClick={() => onDelete(movie)}
               className={`flex-1 sm:flex-initial px-4 py-2.5 sm:py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 border ${
                 actionFocusIndex === 2
-                  ? 'bg-red-600 text-white border-red-600 ring-4 ring-white scale-105 shadow-xl'
-                  : 'bg-neutral-800/90 hover:bg-red-950/60 text-neutral-300 hover:text-red-400 border-neutral-700 hover:border-red-600'
+                  ? 'bg-red-600 text-white border-red-600 ring-4 ring-red-400 scale-105 shadow-md'
+                  : 'bg-white hover:bg-red-50 text-red-600 border-red-200'
               }`}
             >
-              <Trash2 className="w-4 h-4" />
-              <span>Excluir</span>
+              <Trash2 className="w-4 h-4 text-red-600" />
+              <span>Excluir Filme</span>
             </button>
           </div>
         </div>
