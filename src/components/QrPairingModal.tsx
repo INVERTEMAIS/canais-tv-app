@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'qrcode';
 import { QrCode, Smartphone, Wifi, CheckCircle2, Copy, Check, RefreshCw, X, Film, Sparkles } from 'lucide-react';
 import { MovieItem } from '../types/movies';
+import { getApiUrl, getApiBaseUrl } from '../utils/apiConfig';
 
 interface QrPairingModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export const QrPairingModal: React.FC<QrPairingModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/pareamento/criar', { method: 'POST' });
+      const res = await fetch(getApiUrl('/api/pareamento/criar'), { method: 'POST' });
       if (!res.ok) throw new Error('Falha ao gerar sessão de pareamento');
       const data: PairingSessionData = await res.json();
       setSession(data);
@@ -48,11 +49,13 @@ export const QrPairingModal: React.FC<QrPairingModalProps> = ({
       } catch {}
 
       // Determina a melhor URL para o celular acessar
-      // Se estamos acessando pelo navegador em https ou domínio público, usa o origin
-      // Se for Android TV local (localhost / 127.0.0.1), usa o IP primário da rede local
       let baseUrl = window.location.origin;
       const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isLocalHost && data.primaryIp && data.primaryIp !== 'localhost') {
+      const isCapacitor = window.location.protocol === 'capacitor:' || window.location.protocol === 'file:';
+
+      if (isCapacitor || !baseUrl.startsWith('http')) {
+        baseUrl = getApiBaseUrl() || window.location.origin;
+      } else if (isLocalHost && data.primaryIp && data.primaryIp !== 'localhost') {
         baseUrl = `http://${data.primaryIp}:${data.port || 3000}`;
       }
 
@@ -96,7 +99,7 @@ export const QrPairingModal: React.FC<QrPairingModalProps> = ({
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/pareamento/consumir/${session.token}`, { method: 'POST' });
+        const res = await fetch(getApiUrl(`/api/pareamento/consumir/${session.token}`), { method: 'POST' });
         if (res.ok) {
           const data = await res.json();
           if (data.movies && data.movies.length > 0) {

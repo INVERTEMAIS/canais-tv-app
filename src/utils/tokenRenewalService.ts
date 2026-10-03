@@ -1,5 +1,6 @@
 import { MovieItem } from '../types/movies';
 import { loadCatalogSettings, saveMoviesCatalog, extractTokenExpiration } from './moviesCatalogStorage';
+import { getApiUrl } from './apiConfig';
 
 export interface TokenRenewalResult {
   success: boolean;
@@ -28,7 +29,7 @@ export interface DomainCheckResult {
  */
 export async function testDomainConnectivity(domain: string): Promise<DomainCheckResult> {
   try {
-    const response = await fetch('/api/testar-dominio', {
+    const response = await fetch(getApiUrl('/api/testar-dominio'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ domain }),
@@ -64,7 +65,7 @@ export async function renewMovieToken(
   }
 
   try {
-    const response = await fetch('/api/renovar-token', {
+    const response = await fetch(getApiUrl('/api/renovar-token'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

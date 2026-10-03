@@ -18,6 +18,7 @@ import {
   Search
 } from 'lucide-react';
 import { MovieCategory } from '../types/movies';
+import { getApiUrl } from '../utils/apiConfig';
 
 const CATEGORIES: MovieCategory[] = [
   'Ação',
@@ -79,7 +80,7 @@ export const MobileConnectView: React.FC<MobileConnectViewProps> = ({ onBackToAp
   const checkSession = async (tokenToCheck: string) => {
     setSessionStatus('checking');
     try {
-      const res = await fetch(`/api/pareamento/status/${tokenToCheck}`);
+      const res = await fetch(getApiUrl(`/api/pareamento/status/${tokenToCheck}`));
       if (res.ok) {
         const data = await res.json();
         if (data.code) setCode(data.code);
@@ -97,7 +98,7 @@ export const MobileConnectView: React.FC<MobileConnectViewProps> = ({ onBackToAp
     if (!code.trim()) return;
     setSessionStatus('checking');
     try {
-      const res = await fetch(`/api/pareamento/status/${code.trim()}`);
+      const res = await fetch(getApiUrl(`/api/pareamento/status/${code.trim()}`));
       if (res.ok) {
         const data = await res.json();
         setToken(data.token);
@@ -138,7 +139,7 @@ export const MobileConnectView: React.FC<MobileConnectViewProps> = ({ onBackToAp
     setErrorToast(null);
 
     try {
-      const res = await fetch('/api/fetch-movie-metadata', {
+      const res = await fetch(getApiUrl('/api/fetch-movie-metadata'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +181,7 @@ export const MobileConnectView: React.FC<MobileConnectViewProps> = ({ onBackToAp
     setTokenTestResult(null);
 
     try {
-      const res = await fetch('/api/renovar-token', {
+      const res = await fetch(getApiUrl('/api/renovar-token'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,7 +241,7 @@ export const MobileConnectView: React.FC<MobileConnectViewProps> = ({ onBackToAp
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/pareamento/adicionar', {
+      const res = await fetch(getApiUrl('/api/pareamento/adicionar'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

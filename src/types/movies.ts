@@ -32,6 +32,7 @@ export type MovieCategory =
 export interface CatalogSettings {
   redecanaisDomain: string; // Domínio global ativo (ex: 'https://redecanais.la')
   autoRenewOn403: boolean; // Se deve tentar renovação automática no erro 403
+  backendServerUrl?: string; // URL do servidor backend para Android TV APK / Capacitor
   lastCheckedDomainStatus?: {
     ok: boolean;
     status: number;

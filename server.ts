@@ -79,21 +79,263 @@ function getLocalIps(): string[] {
   return ips;
 }
 
-// Headers comuns simulando navegador Google Chrome Desktop em português
+// Headers observados na requisição real do RedeCanais e download.api
 const BROWSER_HEADERS: Record<string, string> = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  Accept:
+  accept:
     'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-  'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Sec-Fetch-User': '?1',
-  'Upgrade-Insecure-Requests': '1',
-  'Cache-Control': 'no-cache',
-  Pragma: 'no-cache',
+  'accept-language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+  'cache-control': 'no-cache',
+  pragma: 'no-cache',
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+  'x-requested-with': 'RC-Site-Requests',
+  h31ffadrg3bb: 'h31ffadrg3fj345a',
 };
+
+/* =========================================================
+   NORMALIZA URL ENCONTRADA NO JAVASCRIPT
+   ========================================================= */
+function normalizeUrl(value: string, baseUrl: string): string | null {
+  if (!value) return null;
+  let url = value.trim();
+
+  // Remove aspas externas
+  url = url.replace(/^["'`]+|["'`]+$/g, '');
+
+  // Escapes comuns dentro do JavaScript
+  url = url
+    .replace(/\\u0026/g, '&')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/g, '&');
+
+  /*
+   * A página pode trazer:
+   * //host/...
+   * ///host/...
+   * ////host/...
+   * Todas devem virar: https://host/...
+   */
+  if (/^\/{2,}/.test(url)) {
+    url = 'https:' + url.replace(/^\/+/, '//');
+  }
+
+  try {
+    return new URL(url, baseUrl).toString();
+  } catch {
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+    return null;
+  }
+}
+
+/* =========================================================
+   EXTRAIR URL DO HTML (const redirectUrl / window.open)
+   ========================================================= */
+function extractRedirectUrlFromHtml(html: string, pageUrl: string): string | null {
+  if (!html) return null;
+
+  const patterns = [
+    // const redirectUrl = '...'
+    /(?:const|let|var)\s+redirectUrl\s*=\s*(['"`])([\s\S]*?)\1/i,
+
+    // window.open("...", "_self")
+    /window\.open\s*\(\s*(['"`])([\s\S]*?)\1\s*,\s*(['"`])_self\3\s*\)/i,
+
+    // window.location.href = "..."
+    /window\.location(?:\.href)?\s*=\s*(['"`])([\s\S]*?)\1/i,
+
+    // location.replace("...")
+    /location\.replace\s*\(\s*(['"`])([\s\S]*?)\1\s*\)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match) continue;
+
+    const rawUrl = match[2];
+    if (!rawUrl) continue;
+
+    const normalized = normalizeUrl(rawUrl, pageUrl);
+    if (!normalized) continue;
+
+    /*
+     * Aceitamos o endereço se for claramente um vídeo ou o proxy usado pela página.
+     */
+    if (
+      /\.mp4(?:\?|$)/i.test(normalized) ||
+      /\/proxy(?:\?|$)/i.test(normalized) ||
+      normalized.includes('container=videos')
+    ) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+/* =========================================================
+   EXTRAIR MP4 INTERNO DO PROXY
+   ========================================================= */
+function extractInnerMp4(proxyUrl: string): string | null {
+  if (!proxyUrl) return null;
+
+  /*
+   * Exemplo real:
+   * https://host/proxy?container=videos&refresh=31622400&url=https://neosoro.gq/V/.../AGUSMRTS.mp4?sv=196...
+   */
+  const match = proxyUrl.match(
+    /[?&]url=(https?:\/\/.*?\.mp4(?:\?[^&]*)?)(?=&(?:falldown|cc|secure_uri|ip|ipv6|ip_bind)=|$)/i
+  );
+
+  if (match?.[1]) {
+    return match[1];
+  }
+
+  // Fallback: procura qualquer .mp4 dentro da URL
+  const fallback = proxyUrl.match(/https?:\/\/[^&"'<>]+\.mp4(?:\?[^&"'<>]*)?/i);
+  return fallback?.[0] || null;
+}
+
+/* =========================================================
+   EXTRAIR TOKEN & EXPIRAÇÃO
+   ========================================================= */
+function extractToken(url: string): {
+  token: string | null;
+  timestamp: number | null;
+  expiresAt: number | null;
+} {
+  const match = url.match(/[?&]nu3zAQc9HC3GbwJq=([^&]+)/i);
+
+  if (!match) {
+    return { token: null, timestamp: null, expiresAt: null };
+  }
+
+  const token = decodeURIComponent(match[1]);
+  const timestampText = token.split('-')[0];
+  const timestamp = Number(timestampText);
+
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return { token, timestamp: null, expiresAt: null };
+  }
+
+  return {
+    token,
+    timestamp,
+    expiresAt: timestamp * 1000,
+  };
+}
+
+/* =========================================================
+   BUSCAR HTML
+   ========================================================= */
+async function fetchPage(
+  url: string,
+  referer?: string
+): Promise<{
+  html: string;
+  finalUrl: string;
+  status: number;
+}> {
+  const headers: Record<string, string> = {
+    ...BROWSER_HEADERS,
+  };
+
+  if (referer) {
+    headers.referer = referer;
+    headers.Referer = referer;
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    redirect: 'follow',
+  });
+
+  const html = await response.text();
+
+  return {
+    html,
+    finalUrl: response.url || url,
+    status: response.status,
+  };
+}
+
+/* =========================================================
+   PROCESSAR DOWNLOAD.API DIRETAMENTE
+   ========================================================= */
+async function resolveDownloadApi(downloadApiUrl: string) {
+  let targetUrl = downloadApiUrl.trim();
+
+  // Se for redirect.api com parâmetro ?r=/player3/download.api...
+  if (targetUrl.includes('redirect.api') && targetUrl.includes('r=')) {
+    try {
+      const urlObj = new URL(targetUrl);
+      const rParam = urlObj.searchParams.get('r');
+      if (rParam) {
+        targetUrl = new URL(rParam, targetUrl).toString();
+      }
+    } catch {}
+  }
+
+  let originReferer = 'https://redecanais.af/';
+  try {
+    const parsed = new URL(targetUrl);
+    originReferer = `${parsed.protocol}//${parsed.host}/`;
+  } catch {}
+
+  const page = await fetchPage(targetUrl, originReferer);
+
+  /*
+   * Aqui acontece a extração direta do HTML:
+   * HTML -> redirectUrl/window.open -> URL proxy
+   */
+  const proxyUrl = extractRedirectUrlFromHtml(page.html, page.finalUrl);
+
+  if (!proxyUrl) {
+    // Tenta fallback com o decodificador Base64 legado caso a página venha ofuscada
+    const decoded = decodeRedeCanaisDownloadApi(page.html);
+    if (decoded && (decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl)) {
+      return {
+        success: true,
+        streamUrl: decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl,
+        newStreamUrl: decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl,
+        directMp4Url: decoded.directMp4Url,
+        proxyUrl: decoded.proxyUrl,
+        detectedToken: decoded.detectedToken,
+        expiresAt: decoded.expiresAt,
+        sourcePage: page.finalUrl,
+        htmlLength: page.html.length,
+        methodUsed: 'html-base64-fallback',
+      };
+    }
+
+    return {
+      success: false,
+      status: page.status,
+      finalUrl: page.finalUrl,
+      htmlLength: page.html.length,
+      error: 'Não encontrei redirectUrl/window.open com a URL do vídeo no HTML.',
+    };
+  }
+
+  const directMp4Url = extractInnerMp4(proxyUrl);
+  const token = extractToken(proxyUrl);
+
+  return {
+    success: true,
+    newStreamUrl: proxyUrl,
+    streamUrl: proxyUrl,
+    proxyUrl,
+    directMp4Url,
+    detectedToken: token.token,
+    tokenTimestamp: token.timestamp,
+    expiresAt: token.expiresAt,
+    sourcePage: page.finalUrl,
+    htmlLength: page.html.length,
+    methodUsed: 'html-javascript-extraction',
+  };
+}
 
 /**
  * Função inteligente de extração de URL de vídeo MP4 e token dentro de HTML ou script
@@ -169,7 +411,23 @@ function decodeRedeCanaisDownloadApi(
   expiresAt?: number;
   recommendedUrl?: string;
 } | null {
-  if (!html || !html.includes('String.fromCharCode') || !html.includes('forEach')) {
+  if (!html) return null;
+
+  // 1. Extração direta instantânea de redirectUrl / window.open no HTML do script
+  const directRedirect = extractRedirectUrlFromHtml(html, 'https://redecanais.af/');
+  if (directRedirect) {
+    const directMp4 = extractInnerMp4(directRedirect);
+    const token = extractToken(directRedirect);
+    return {
+      directMp4Url: directMp4 || undefined,
+      proxyUrl: directRedirect,
+      detectedToken: token.token || undefined,
+      expiresAt: token.expiresAt || undefined,
+      recommendedUrl: directRedirect,
+    };
+  }
+
+  if (!html.includes('String.fromCharCode') || !html.includes('forEach')) {
     return null;
   }
 
@@ -251,7 +509,7 @@ function decodeRedeCanaisDownloadApi(
     } catch {}
   }
 
-  const recommendedUrl = directMp4Url || updatedCurrentStream || proxyUrl;
+  const recommendedUrl = proxyUrl || updatedCurrentStream || directMp4Url;
 
   return {
     directMp4Url,
@@ -406,6 +664,7 @@ async function emulateAutomaMacroRenewal(
 ): Promise<{
   success: boolean;
   newStreamUrl?: string;
+  streamUrl?: string;
   directMp4Url?: string;
   proxyUrl?: string;
   detectedToken?: string;
@@ -419,28 +678,23 @@ async function emulateAutomaMacroRenewal(
     resolvedUrl = `https://${resolvedUrl}`;
   }
 
-  // 1. Se a URL fornecida for diretamente a API de download (download.api?download=...)
-  if (resolvedUrl.includes('download.api')) {
+  // 1. Se a URL fornecida for diretamente a API de download ou redirect (download.api / redirect.api)
+  if (resolvedUrl.includes('download.api') || resolvedUrl.includes('redirect.api')) {
     try {
-      const apiRes = await fetch(resolvedUrl, {
-        headers: { ...BROWSER_HEADERS, Referer: resolvedUrl },
-        signal: AbortSignal.timeout(9000),
-      });
-      if (apiRes.ok) {
-        const apiHtml = await apiRes.text();
-        const decoded = decodeRedeCanaisDownloadApi(apiHtml, currentStreamUrl);
-        if (decoded && (decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl)) {
-          return {
-            success: true,
-            newStreamUrl: decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl,
-            directMp4Url: decoded.directMp4Url,
-            proxyUrl: decoded.proxyUrl,
-            detectedToken: decoded.detectedToken,
-            expiresAt: decoded.expiresAt || null,
-            methodUsed: 'automa-direct-download-api',
-            finalPageUrl: apiRes.url,
-          };
-        }
+      const dlRes = await resolveDownloadApi(resolvedUrl);
+      if (dlRes && dlRes.success && (dlRes.proxyUrl || dlRes.streamUrl || dlRes.newStreamUrl)) {
+        const bestUrl = dlRes.proxyUrl || dlRes.streamUrl || dlRes.newStreamUrl;
+        return {
+          success: true,
+          newStreamUrl: bestUrl,
+          streamUrl: bestUrl,
+          proxyUrl: dlRes.proxyUrl,
+          directMp4Url: dlRes.directMp4Url,
+          detectedToken: dlRes.detectedToken,
+          expiresAt: dlRes.expiresAt || null,
+          methodUsed: dlRes.methodUsed || 'automa-direct-download-api',
+          finalPageUrl: dlRes.sourcePage || resolvedUrl,
+        };
       }
     } catch (e: any) {
       console.warn('Falha no acesso direto à download.api:', e);
@@ -518,28 +772,22 @@ async function emulateAutomaMacroRenewal(
   // Itera sobre os alvos clicáveis (emulando as requisições geradas pelo clique)
   for (const targetUrl of clickTargets) {
     try {
-      // Se for download.api
-      if (targetUrl.includes('download.api')) {
-        const dlRes = await fetch(targetUrl, {
-          headers: { ...BROWSER_HEADERS, Referer: finalPageUrl },
-          redirect: 'follow',
-          signal: AbortSignal.timeout(8000),
-        });
-        if (dlRes.ok) {
-          const dlHtml = await dlRes.text();
-          const decoded = decodeRedeCanaisDownloadApi(dlHtml, currentStreamUrl);
-          if (decoded && (decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl)) {
-            return {
-              success: true,
-              newStreamUrl: decoded.recommendedUrl || decoded.directMp4Url || decoded.proxyUrl,
-              directMp4Url: decoded.directMp4Url,
-              proxyUrl: decoded.proxyUrl,
-              detectedToken: decoded.detectedToken,
-              expiresAt: decoded.expiresAt || null,
-              methodUsed: 'automa-macro-click-download-api',
-              finalPageUrl: dlRes.url,
-            };
-          }
+      // Se for download.api ou redirect.api
+      if (targetUrl.includes('download.api') || targetUrl.includes('redirect.api')) {
+        const dlResult = await resolveDownloadApi(targetUrl);
+        if (dlResult && dlResult.success && (dlResult.proxyUrl || dlResult.streamUrl || dlResult.newStreamUrl)) {
+          const bestUrl = dlResult.proxyUrl || dlResult.streamUrl || dlResult.newStreamUrl;
+          return {
+            success: true,
+            newStreamUrl: bestUrl,
+            streamUrl: bestUrl,
+            proxyUrl: dlResult.proxyUrl,
+            directMp4Url: dlResult.directMp4Url,
+            detectedToken: dlResult.detectedToken,
+            expiresAt: dlResult.expiresAt || null,
+            methodUsed: 'automa-macro-click-download-api',
+            finalPageUrl: dlResult.sourcePage || targetUrl,
+          };
         }
       }
 
@@ -732,22 +980,76 @@ app.post('/api/testar-dominio', async (req: Request, res: Response) => {
   }
 });
 
+/* =========================================================
+   TESTAR HTML (DIAGNÓSTICO DIRETO)
+   ========================================================= */
+app.get('/api/testar-html', async (req: Request, res: Response) => {
+  try {
+    const url = String(req.query.url || '').trim();
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe ?url=...',
+      });
+    }
+
+    const page = await fetchPage(url);
+    const redirectUrl = extractRedirectUrlFromHtml(page.html, page.finalUrl);
+    const directMp4 = redirectUrl ? extractInnerMp4(redirectUrl) : null;
+    const token = redirectUrl ? extractToken(redirectUrl) : null;
+
+    return res.json({
+      success: true,
+      requestUrl: url,
+      finalUrl: page.finalUrl,
+      status: page.status,
+      htmlLength: page.html.length,
+      foundRedirectUrl: Boolean(redirectUrl),
+      redirectUrl,
+      directMp4Url: directMp4,
+      token: token?.token,
+      expiresAt: token?.expiresAt,
+      hasRedirectUrlVariable: /redirectUrl/i.test(page.html),
+      hasWindowOpen: /window\.open/i.test(page.html),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
 // Rota 2: Renovacao automatica de Token via Pagina de Origem
 // Configurada com a macro Automa (puxarlink_network_v2)
 // Dispara cliques nos botoes img e a:contains(Baixar) e intercepta links com mp4
 app.post('/api/renovar-token', async (req: Request, res: Response) => {
-  const { sourcePageUrl, baseDomain, currentStreamUrl } = req.body;
+  const urlParam = String(
+    req.body?.url || req.body?.streamUrl || req.body?.sourcePageUrl || req.query?.url || ''
+  ).trim();
 
-  if (!sourcePageUrl || typeof sourcePageUrl !== 'string') {
+  const { sourcePageUrl, baseDomain, currentStreamUrl } = req.body;
+  const targetUrl = urlParam || sourcePageUrl;
+
+  if (!targetUrl || typeof targetUrl !== 'string') {
     return res.status(400).json({
       success: false,
-      error: 'URL da página de origem não fornecida para este filme',
+      error: 'URL não informada para renovação de link.',
     });
   }
 
-  let resolvedPageUrl = sourcePageUrl.trim().replace(/#.*$/, '');
+  /*
+   * Se já recebeu diretamente uma URL do download.api,
+   * processa diretamente via extração do HTML
+   */
+  if (targetUrl.includes('download.api')) {
+    const dlResult = await resolveDownloadApi(targetUrl);
+    return res.json(dlResult);
+  }
 
-  // Aplica domínio base caso seja relativo ou se baseDomain for especificado (exceto para links diretos de download.api)
+  let resolvedPageUrl = targetUrl.trim().replace(/#.*$/, '');
+
+  // Aplica domínio base caso seja relativo ou se baseDomain for especificado
   if (baseDomain && typeof baseDomain === 'string' && !resolvedPageUrl.includes('download.api')) {
     const cleanBase = baseDomain.replace(/\/+$/, '');
     if (resolvedPageUrl.startsWith('/')) {
@@ -773,6 +1075,7 @@ app.post('/api/renovar-token', async (req: Request, res: Response) => {
       return res.json({
         success: true,
         newStreamUrl: renewalResult.newStreamUrl,
+        streamUrl: renewalResult.newStreamUrl,
         directMp4Url: renewalResult.directMp4Url,
         proxyUrl: renewalResult.proxyUrl,
         detectedToken: renewalResult.detectedToken,
@@ -867,24 +1170,29 @@ app.post('/api/fetch-movie-metadata', async (req: Request, res: Response) => {
               html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
             if (ogImgMatch) pageImage = ogImgMatch[1].trim();
 
-            // Se for página do RedeCanais download.api, decodifica diretamente
-            if (inputUrl.includes('download.api')) {
-              const decoded = decodeRedeCanaisDownloadApi(html);
-              if (decoded && (decoded.recommendedUrl || decoded.directMp4Url)) {
-                detectedStreamUrl = decoded.recommendedUrl || decoded.directMp4Url || '';
+            // Se for página do RedeCanais download.api ou redirect.api, decodifica diretamente
+            if (inputUrl.includes('download.api') || inputUrl.includes('redirect.api')) {
+              const decoded = await resolveDownloadApi(inputUrl);
+              if (decoded && decoded.success && (decoded.streamUrl || decoded.directMp4Url || decoded.proxyUrl)) {
+                detectedStreamUrl = decoded.streamUrl || decoded.directMp4Url || decoded.proxyUrl || '';
               }
             } else if (!detectedStreamUrl) {
-              // Aplica a macro Automa puxarlink_network_v2 (*://*/*-*-*/*?*mp4* e img, a:contains("Baixar"))
-              try {
-                const automaRes = await emulateAutomaMacroRenewal(inputUrl);
-                if (automaRes.success && automaRes.newStreamUrl) {
-                  detectedStreamUrl = automaRes.newStreamUrl;
-                }
-              } catch {}
+              const directExtracted = extractRedirectUrlFromHtml(html, inputUrl);
+              if (directExtracted) {
+                detectedStreamUrl = directExtracted;
+              } else {
+                // Aplica a macro Automa puxarlink_network_v2 (*://*/*-*-*/*?*mp4* e img, a:contains("Baixar"))
+                try {
+                  const automaRes = await emulateAutomaMacroRenewal(inputUrl);
+                  if (automaRes.success && automaRes.newStreamUrl) {
+                    detectedStreamUrl = automaRes.newStreamUrl;
+                  }
+                } catch {}
 
-              if (!detectedStreamUrl) {
-                const extracted = extractVideoUrlFromHtml(html, inputUrl);
-                if (extracted) detectedStreamUrl = extracted;
+                if (!detectedStreamUrl) {
+                  const extracted = extractVideoUrlFromHtml(html, inputUrl);
+                  if (extracted) detectedStreamUrl = extracted;
+                }
               }
             }
           }

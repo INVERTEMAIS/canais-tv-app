@@ -3,6 +3,7 @@ import { X, Plus, AlertCircle, Link as LinkIcon, ShieldAlert, Globe, Zap, Search
 import { MovieCategory, MovieItem } from '../types/movies';
 import { NETFLIX_PALETTES, unwrapStreamUrl, extractTokenExpiration } from '../utils/moviesCatalogStorage';
 import { useModalArrowNavigation } from '../hooks/useModalArrowNavigation';
+import { getApiUrl } from '../utils/apiConfig';
 
 const CATEGORIES: MovieCategory[] = [
   'Ação',
@@ -91,7 +92,7 @@ export const AddMovieModal: React.FC<AddMovieModalProps> = ({
     setFetchSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/fetch-movie-metadata', {
+      const res = await fetch(getApiUrl('/api/fetch-movie-metadata'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
